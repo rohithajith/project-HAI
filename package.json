@@ -1,0 +1,29 @@
+{
+  "name": "hotel-management-system",
+  "version": "1.0.0",
+  "description": "A comprehensive web application for hotel management",
+  "main": "index.js",
+  "scripts": {
+    "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
+    "start:backend": "cd backend && npm start",
+    "start:frontend": "cd frontend && npm start",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "setup-and-start": "npm run install:all && npm start",
+    "test": "concurrently \"cd backend && npm test\" \"cd frontend && npm test\"",
+    "setup:chatbot": "python setup_chatbot.py",
+    "test:gpu": "python test_gpu_and_model.py"
+  },
+  "keywords": [
+    "hotel",
+    "management",
+    "react",
+    "node",
+    "express",
+    "sqlite"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
