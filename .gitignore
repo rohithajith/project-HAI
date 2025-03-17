@@ -1,7 +1,6 @@
 # Dependencies
 node_modules/
-/.pnp
-.pnp.js
+
 
 # Ignore the virtual environment
 virtual/
@@ -41,7 +40,73 @@ yarn-error.log*
 Thumbs.db
 
 # Ignore model.safetensors files
-model.safetensors
+finetunedmodel-merged/
+
+bitsandbytes/
+
 
 # Ignore model path directory
 C:/Users/2312205/.cache/huggingface/hub/models--rohith0990--finetunedmodel-merged/snapshots/f889ed079cdb36153a3ecd67cd54435ce20d5bbb/
+
+# Ignore virtual environment directory
+myenv/
+
+# Environment files (Secrets & Config)
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# Node modules (Dependencies)
+node_modules/
+
+# Python virtual environments
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Large & Temporary Files
+*.log
+*.lock
+*.pid
+*.seed
+*.csv
+*.sqlite
+*.sqlite3
+*.db
+
+# IDE / Editor Specific
+.vscode/
+*.swp
+*.swo
+*.swn
+
+# Frontend Build Files
+frontend/build/
+frontend/node_modules/
+frontend/.next/
+frontend/.nuxt/
+frontend/dist/
+
+# Backend Build Files
+backend/node_modules/
+backend/build/
+backend/dist/
+
+# SafeTensors & Model Checkpoints (Large AI files)
+backend/models/**/*.safetensors
+backend/models/**/*.pt
+backend/models/**/*.onnx
+backend/models/**/*.bin
+backend/models/**/*.json
+backend/models/**/*.h5
+backend/models/**/*.pb
+
+# Git Ignore Cache Files
+.gitignore
+backend/models/models--gpt2/refs/main
+backend/models/models--gpt2/snapshots/607a30d783dfa663caf39e06633721c8d4cfcd7e/merges.txt
+backend/models/models--gpt2/.no_exist/607a30d783dfa663caf39e06633721c8d4cfcd7e/chat_template.jinja

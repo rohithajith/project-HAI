@@ -1,26 +1,64 @@
-import os
-import requests
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
-# Define the model URL
-model_url = "https://huggingface.co/rohith0990/finetunedmodel-merged/model.tar.gz"
+def load_model():
+    """Load the local model from the correct snapshot directory"""
+    model_path = "gpt2" # Using a smaller, standard model for CPU test
 
-# Define the output directory
-output_dir = "finetunedmodel-merged"
+    print(f"Loading model from: {model_path}")
 
-# Download the model
-os.makedirs(output_dir, exist_ok=True)
-response = requests.get(model_url)
-with open(os.path.join(output_dir, "model.tar.gz"), "wb") as f:
-    f.write(response.content)
+    tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+    model = AutoModelForCausalLM.from_pretrained(
+        model_path,
+        trust_remote_code=True,
+        load_in_8bit=True,  # Enable bitsandbytes quantization if needed
+        device_map="auto"  # Automatically selects CUDA if available
+    )
 
-# Test the model with a sample message
-sample_message = "Hello, how are you?"
+    print("✅ Model loaded successfully!")
+    return model, tokenizer
 
-# Add your code to load the model and use it to process the sample message
-# This is just a placeholder, you will need to replace it with the actual code to load the model and process the message
-print("Processing message:", sample_message)
 
-# Save the output to a file
-with open(os.path.join(output_dir, "output.txt"), "w") as f:
-    f.write("Output:\n")
-    f.write("Model output: This is a placeholder output\n")
+def chat_with_model(model, tokenizer):
+    """Chat with the model in the terminal"""
+    print("\nWelcome to the chatbot! Type 'exit' to quit.")
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    while True:
+        user_input = input("\nYou: ")
+        if user_input.lower() == "exit":
+            break
+
+        # ✅ Add system prompt to enforce assistant behavior
+        system_prompt = (
+            "You are an AI assistant for a hotel. "
+            "Respond to guests politely and efficiently. "
+            "Keep responses concise and professional."
+        )
+
+        # ✅ Format the input with system prompt
+        full_prompt = f"<|system|>\n{system_prompt}\n<|user|>\n{user_input}\n<|assistant|>\n"
+
+        # Tokenize and move input tensors to the correct device
+        inputs = tokenizer(full_prompt, return_tensors="pt")
+        inputs = {key: value.to(device) for key, value in inputs.items()}
+
+        # ✅ Generate response with sampling controls
+        outputs = model.generate(
+            **inputs,
+            max_length=150,
+            temperature=0.7,  # Controls randomness (lower = more predictable)
+            top_k=50,         # Limits low-likelihood words
+            top_p=0.9,        # Nucleus sampling (removes unlikely words)
+            repetition_penalty=1.2  # Reduces repeating phrases
+        )
+
+        # Decode and print the response
+        response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        print("\n🤖 Chatbot:", response)
+
+
+if __name__ == "__main__":
+    model, tokenizer = load_model()
+    chat_with_model(model, tokenizer)
