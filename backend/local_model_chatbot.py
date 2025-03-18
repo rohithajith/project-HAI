@@ -33,7 +33,7 @@ logger = logging.getLogger("local_model_chatbot")
 SYSTEM_PROMPT = "you are a helpfull hotel ai which acts like hotel reception udating requests and handiling queries from users"
 
 # Model configuration
-MODEL_NAME = "models/rohith0990_finetunedmodel_merged/"  # Using the downloaded fine-tuned model
+MODEL_NAME = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "finetunedmodel-merged")  # Using the downloaded fine-tuned model
 MODEL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models")
 
 # Ensure model directory exists
@@ -42,30 +42,72 @@ os.makedirs(MODEL_DIR, exist_ok=True)
 def load_model_and_tokenizer():
     """Load the model and tokenizer, downloading if necessary"""
     try:
-        from transformers import AutoModelForCausalLM, AutoTokenizer
+        from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
         import torch
 
-        # Check if CUDA is available
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        logger.info(f"Using device: {device}")
-        
-        # Check if we have GPU info
-        if device == "cuda":
+        # Force CUDA to be used
+        if not torch.cuda.is_available():
+            logger.warning("CUDA not available. This script is optimized for GPU usage.")
+            device = "cpu"
+        else:
+            device = "cuda"
+            logger.info(f"Using device: {device}")
             logger.info(f"GPU: {torch.cuda.get_device_name(0)}")
             logger.info(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1024 / 1024 / 1024:.2f} GB")
+            logger.info(f"CUDA Version: {torch.version.cuda}")
         
-        # Load tokenizer and model (will download if not present)
-        logger.info(f"Loading model and tokenizer from {MODEL_NAME}")
+        # Load tokenizer
+        logger.info(f"Loading tokenizer from {MODEL_NAME}")
         tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, cache_dir=MODEL_DIR)
-        model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, cache_dir=MODEL_DIR)
         
-        # Move model to device (GPU if available)
-        model = model.to(device)
+        # Configure quantization for GPU
+        if device == "cuda":
+            try:
+                # Try to import bitsandbytes
+                import bitsandbytes as bnb
+                logger.info(f"Using bitsandbytes version: {bnb.__version__}")
+                
+                # Configure 4-bit quantization
+                quantization_config = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_compute_dtype=torch.float16,
+                    bnb_4bit_use_double_quant=True,
+                    bnb_4bit_quant_type="nf4"
+                )
+                
+                # Load model with quantization
+                logger.info("Loading model with 4-bit quantization")
+                model = AutoModelForCausalLM.from_pretrained(
+                    MODEL_NAME,
+                    cache_dir=MODEL_DIR,
+                    device_map="auto",
+                    quantization_config=quantization_config
+                )
+            except (ImportError, Exception) as e:
+                logger.warning(f"Failed to load with bitsandbytes quantization: {e}")
+                logger.info("Falling back to FP16 precision")
+                
+                # Load with half precision
+                model = AutoModelForCausalLM.from_pretrained(
+                    MODEL_NAME,
+                    cache_dir=MODEL_DIR,
+                    torch_dtype=torch.float16,
+                    device_map="auto"
+                )
+        else:
+            # CPU loading
+            logger.info("Loading model on CPU")
+            model = AutoModelForCausalLM.from_pretrained(
+                MODEL_NAME,
+                cache_dir=MODEL_DIR,
+                low_cpu_mem_usage=True
+            )
+            model = model.to(device)
         
         return model, tokenizer, device
     except ImportError as e:
         logger.error(f"Error importing required modules: {e}")
-        logger.error("Please install the required packages with: pip install torch transformers")
+        logger.error("Please install the required packages with: pip install torch transformers bitsandbytes")
         sys.exit(1)
     except Exception as e:
         logger.error(f"Error loading model: {e}")

@@ -36,11 +36,89 @@ logger = logging.getLogger("local_model_chatbot")
 SYSTEM_PROMPT = "you are a helpfull hotel ai which acts like hotel reception udating requests and handiling queries from users"
 
 # Model configuration
-MODEL_NAME = "models/rohith0990_finetunedmodel_merged/"  # Using the downloaded fine-tuned model
+MODEL_NAME = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "finetunedmodel-merged")  # Using the downloaded fine-tuned model
 MODEL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models")
 
 # Ensure model directory exists
 os.makedirs(MODEL_DIR, exist_ok=True)
+
+# Helper functions for model loading strategies
+def load_with_bitsandbytes_4bit(model_name, cache_dir):
+    """Load model with 4-bit quantization using bitsandbytes"""
+    from transformers import AutoModelForCausalLM, BitsAndBytesConfig
+    import torch
+    import bitsandbytes as bnb
+    
+    # Configure 4-bit quantization
+    quantization_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_compute_dtype=torch.float16,
+        bnb_4bit_use_double_quant=True,
+        bnb_4bit_quant_type="nf4"
+    )
+    
+    # Load model with quantization
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        cache_dir=cache_dir,
+        device_map="auto",
+        quantization_config=quantization_config
+    )
+    
+    return model
+
+def load_with_bitsandbytes_8bit(model_name, cache_dir):
+    """Load model with 8-bit quantization using bitsandbytes"""
+    from transformers import AutoModelForCausalLM, BitsAndBytesConfig
+    import torch
+    import bitsandbytes as bnb
+    
+    # Configure 8-bit quantization
+    quantization_config = BitsAndBytesConfig(
+        load_in_8bit=True,
+        llm_int8_threshold=6.0
+    )
+    
+    # Load model with quantization
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        cache_dir=cache_dir,
+        device_map="auto",
+        quantization_config=quantization_config
+    )
+    
+    return model
+
+def load_with_fp16(model_name, cache_dir):
+    """Load model with FP16 precision"""
+    from transformers import AutoModelForCausalLM
+    import torch
+    
+    # Load with half precision
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        cache_dir=cache_dir,
+        torch_dtype=torch.float16,
+        device_map="auto"
+    )
+    
+    return model
+
+def load_standard(model_name, cache_dir, device):
+    """Load model with standard settings"""
+    from transformers import AutoModelForCausalLM
+    
+    # Standard loading
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        cache_dir=cache_dir,
+        low_cpu_mem_usage=True
+    )
+    
+    # Move model to device
+    model = model.to(device)
+    
+    return model
 
 # PII patterns for detection
 PII_PATTERNS = {
@@ -74,21 +152,78 @@ def load_model_and_tokenizer():
         start_time = time.time()
 
         # Check if CUDA is available
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        logger.info(f"Using device: {device}")
-        
-        # Check if we have GPU info
-        if device == "cuda":
+        if not torch.cuda.is_available():
+            logger.warning("CUDA not available. This script is optimized for GPU usage.")
+            device = "cpu"
+            
+            # CPU loading - simple path to avoid bitsandbytes completely
+            logger.info("Loading model on CPU")
+            logger.info(f"Loading tokenizer from {MODEL_NAME}")
+            tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, cache_dir=MODEL_DIR)
+            
+            # Standard loading for CPU
+            model = AutoModelForCausalLM.from_pretrained(
+                MODEL_NAME,
+                cache_dir=MODEL_DIR,
+                low_cpu_mem_usage=True
+            )
+            model = model.to(device)
+        else:
+            # GPU path
+            device = "cuda"
+            logger.info(f"Using device: {device}")
             logger.info(f"GPU: {torch.cuda.get_device_name(0)}")
             logger.info(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1024 / 1024 / 1024:.2f} GB")
-        
-        # Load tokenizer and model (will download if not present)
-        logger.info(f"Loading model and tokenizer from {MODEL_NAME}")
-        tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, cache_dir=MODEL_DIR)
-        model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, cache_dir=MODEL_DIR)
-        
-        # Move model to device (GPU if available)
-        model = model.to(device)
+            logger.info(f"CUDA Version: {torch.version.cuda}")
+            
+            # Import GPU-specific modules only when CUDA is available
+            from transformers import BitsAndBytesConfig
+            
+            # Load tokenizer
+            logger.info(f"Loading tokenizer from {MODEL_NAME}")
+            tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, cache_dir=MODEL_DIR)
+            
+            # Configure model loading for GPU
+            logger.info("Checking CUDA setup...")
+            
+            # Check CUDA version and capabilities
+            cuda_version = torch.version.cuda
+            logger.info(f"CUDA Version from PyTorch: {cuda_version}")
+            
+            # Try different loading strategies in order of preference
+            loading_strategies = [
+                {
+                    "name": "4-bit quantization with bitsandbytes",
+                    "fn": lambda: load_with_bitsandbytes_4bit(MODEL_NAME, MODEL_DIR)
+                },
+                {
+                    "name": "8-bit quantization with bitsandbytes",
+                    "fn": lambda: load_with_bitsandbytes_8bit(MODEL_NAME, MODEL_DIR)
+                },
+                {
+                    "name": "FP16 precision",
+                    "fn": lambda: load_with_fp16(MODEL_NAME, MODEL_DIR)
+                },
+                {
+                    "name": "Standard loading with GPU",
+                    "fn": lambda: load_standard(MODEL_NAME, MODEL_DIR, device)
+                }
+            ]
+            
+            # Try each strategy until one works
+            model = None
+            for strategy in loading_strategies:
+                try:
+                    logger.info(f"Trying to load model with {strategy['name']}...")
+                    model = strategy["fn"]()
+                    logger.info(f"Successfully loaded model with {strategy['name']}")
+                    break
+                except Exception as e:
+                    logger.warning(f"Failed to load with {strategy['name']}: {e}")
+            
+            # If all strategies failed, raise an error
+            if model is None:
+                raise RuntimeError("All GPU loading strategies failed. Check your CUDA setup.")
         
         load_time = time.time() - start_time
         logger.info(f"Model loaded in {load_time:.2f} seconds")
@@ -96,7 +231,7 @@ def load_model_and_tokenizer():
         return model, tokenizer, device, load_time
     except ImportError as e:
         logger.error(f"Error importing required modules: {e}")
-        logger.error("Please install the required packages with: pip install torch transformers")
+        logger.error("Please install the required packages with: pip install torch transformers bitsandbytes")
         sys.exit(1)
     except Exception as e:
         logger.error(f"Error loading model: {e}")
