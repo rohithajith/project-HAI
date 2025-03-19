@@ -1,3 +1,7 @@
+""" 
+Run download_hfmodel.py and run this script to test model
+"""
+
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
