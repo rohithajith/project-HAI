@@ -48,14 +48,9 @@ pip uninstall -y torch torchvision torchaudio
 
 Install PyTorch with the appropriate CUDA version:
 
-### For CUDA 11.8:
+### For CUDA 12.4:
 ```bash
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-```
-
-### For CUDA 12.1:
-```bash
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 ```
 
 ## Step 4: Verify PyTorch CUDA Installation
@@ -73,32 +68,13 @@ print("Device name:", torch.cuda.get_device_name(0))
 
 All of these should return valid information about your GPU. If `torch.cuda.is_available()` returns `False`, there's an issue with your CUDA setup.
 
-## Step 5: Install bitsandbytes
-
-### On Linux/Mac:
-```bash
-pip install bitsandbytes
-```
+## Step 5: Install bitsandbytes`
 
 ### On Windows:
-Windows support for bitsandbytes is more complex. Try these options in order:
-
-1. Install the Windows-specific version:
-   ```bash
-   pip install bitsandbytes-windows
-   ```
-
-2. If that doesn't work, try the standard version:
-   ```bash
-   pip install bitsandbytes
-   ```
-
-3. If both fail, you may need to compile from source:
-   ```bash
-   git clone https://github.com/Keith-Hon/bitsandbytes-windows.git
-   cd bitsandbytes-windows
-   pip install -e .
-   ```
+Install the following packages:
+```bash
+pip install bitsandbytes-cuda110 bitsandbytes
+```
 
 ## Step 6: Verify bitsandbytes Installation
 
@@ -107,16 +83,22 @@ Run the following Python code to verify that bitsandbytes is properly installed:
 ```python
 import bitsandbytes
 print("bitsandbytes version:", bitsandbytes.__version__)
-
-# On Linux/Mac, you can also check CUDA capabilities:
-from bitsandbytes.cuda_setup.main import get_compute_capabilities
-print("CUDA capabilities:", get_compute_capabilities())
 ```
+
 
 ## Step 7: Install Other Required Packages
 
 ```bash
 pip install transformers accelerate
+```
+
+## Step 8: Run Python Scripts
+
+Run the following Python scripts to complete the setup:
+
+```bash
+python download_hfmodel.py
+python teste.py
 ```
 
 ## Step 8: Test Loading a Model with Quantization
