@@ -1,7 +1,7 @@
 {
   "name": "hotel-management-system",
   "version": "1.0.0",
-  "description": "A comprehensive web application for hotel management",
+  "description": "A comprehensive web application for hotel management with LangGraph multi-agent AI",
   "main": "index.js",
   "scripts": {
     "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
@@ -11,7 +11,10 @@
     "setup-and-start": "npm run install:all && npm start",
     "test": "concurrently \"cd backend && npm test\" \"cd frontend && npm test\"",
     "setup:chatbot": "python setup_chatbot.py",
-    "test:gpu": "python test_gpu_and_model.py"
+    "test:gpu": "python test_gpu_and_model.py",
+    "start:langgraph": "node start_langgraph_system.js",
+    "setup:langgraph": "cd backend/ai_agents && pip install -r requirements.txt",
+    "setup-and-start:langgraph": "npm run install:all && npm run setup:langgraph && npm run start:langgraph"
   },
   "keywords": [
     "hotel",
@@ -19,11 +22,18 @@
     "react",
     "node",
     "express",
-    "sqlite"
+    "sqlite",
+    "langgraph",
+    "ai",
+    "multi-agent"
   ],
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "uuid": "^9.0.1"
   }
 }
