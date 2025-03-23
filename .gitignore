@@ -63,7 +63,10 @@ node_modules/
 
 # Python virtual environments
 venv/
-__pycache__/
+develop/
+**/Lib/site-packages/
+**/.venv/
+**/__pycache__/
 *.pyc
 *.pyo
 *.pyd

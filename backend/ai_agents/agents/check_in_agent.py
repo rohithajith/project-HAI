@@ -1,3 +1,4 @@
+
 """
 Check-in Agent for the Hotel AI Assistant.
 
@@ -6,11 +7,15 @@ and updating the booking system.
 """
 
 import logging
+import os
 from typing import Dict, List, Any, Optional, Type
 from datetime import datetime
 
 from langchain.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
+from langchain_core.language_models import BaseChatModel
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, BitsAndBytesConfig
+from langchain_huggingface import HuggingFacePipeline
 
 from ..schemas import AgentInput, AgentOutput, CheckInInput, CheckInOutput
 from .base_agent import BaseAgent
@@ -32,8 +37,58 @@ class CheckInAgent(BaseAgent):
             description="Handles guest check-ins, verifies ID and payment, and updates booking records"
         )
         
-        # Initialize the language model
-        self.llm = ChatOpenAI(model=model_name)
+        # Always use the local quantized model
+        model, tokenizer = self.load_model()
+        
+        # Create a text generation pipeline
+        pipe = pipeline(
+            "text-generation",
+            model=model,
+            tokenizer=tokenizer,
+            max_new_tokens=2000,
+            temperature=0.7,
+            top_p=0.9,
+            top_k=50,
+            repetition_penalty=1.2
+        )
+        
+        # Create a LangChain wrapper around the pipeline
+        self.llm = HuggingFacePipeline(pipeline=pipe)
+        logger.info("✅ Using local quantized model")
+    
+    def load_model(self):
+        """Load the local model from the correct snapshot directory"""
+        # Get the root directory of the project (three levels up from the current script)
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
+        model_path = os.path.join(project_root, "finetunedmodel-merged")
+        
+        logger.info(f"Loading model from: {model_path}")
+        
+        # Load tokenizer
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_path,
+            trust_remote_code=True,
+            local_files_only=True  # Explicitly use local files only
+        )
+        
+        # Configure 8-bit quantization
+        quantization_config = BitsAndBytesConfig(
+            load_in_8bit=True,
+            llm_int8_enable_fp32_cpu_offload=True
+        )
+        
+        # Load model with quantization and CUDA support
+        model = AutoModelForCausalLM.from_pretrained(
+            model_path,
+            trust_remote_code=True,
+            local_files_only=True,  # Explicitly use local files only
+            quantization_config=quantization_config,  # Use BitsAndBytesConfig instead of load_in_8bit
+            device_map="auto"       # Automatically use CUDA if available
+        )
+        
+        logger.info("✅ Model loaded successfully!")
+        return model, tokenizer
         
         # Create the prompt template
         self.prompt = ChatPromptTemplate.from_messages([
@@ -102,10 +157,11 @@ class CheckInAgent(BaseAgent):
         {context['latest_message']}
         """
         
-        # Get a response from the LLM
-        llm_response = await self.llm.ainvoke(
-            self.prompt.format(input=formatted_input)
-        )
+        # Format the prompt first
+        formatted_prompt = self.prompt.format(input=formatted_input)
+        
+        # Then invoke the LLM with the formatted prompt
+        llm_response = await self.llm.ainvoke(formatted_prompt)
         
         # Extract booking details and check-in status from the response
         # In a real implementation, this would interact with a database
@@ -120,9 +176,15 @@ class CheckInAgent(BaseAgent):
         # Assign a room number (in a real system, this would be from the booking system)
         room_number = "301" if check_in_status == "completed" else None
         
+        # Handle the response which might be a string or an object with a content attribute
+        if hasattr(llm_response, 'content'):
+            response_content = llm_response.content
+        else:
+            response_content = llm_response
+        
         # Create the response message
         response_message = self.create_message(
-            content=llm_response.content,
+            content=response_content,
             recipient="user"
         )
         

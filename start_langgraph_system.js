@@ -14,8 +14,8 @@ dotenv.config();
 
 // Configuration
 const NODE_ENV = process.env.NODE_ENV || 'development';
-const NODE_PORT = process.env.PORT || 5000;
-const PYTHON_PORT = process.env.PYTHON_PORT || 8000;
+const NODE_PORT = process.env.PORT || 5001;
+const PYTHON_PORT = process.env.PYTHON_PORT || 8001;
 const PYTHON_HOST = process.env.PYTHON_HOST || '0.0.0.0';
 const PYTHON_DEBUG = process.env.PYTHON_DEBUG === 'true';
 
@@ -45,7 +45,7 @@ const socketIo = require('socket.io');
 const socketService = require('./services/socketService');
 
 // Set port
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 5001;
 
 // Create HTTP server
 const server = http.createServer(app);

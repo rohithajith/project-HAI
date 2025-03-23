@@ -5,7 +5,7 @@ const socketIo = require('socket.io');
 const socketService = require('./services/socketService');
 
 // Set port
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 5001;
 
 // Create HTTP server
 const server = http.createServer(app);
@@ -19,7 +19,7 @@ const io = socketIo(server, {
 });
 
 // Initialize socket service
-socketService.initialize(io);
+socketService.init(io);
 
 // Start server
 server.listen(port, () => {

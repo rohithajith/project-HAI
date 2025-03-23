@@ -2,7 +2,7 @@ const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 
 // Configuration for the LangGraph AI Assistant API
-const AI_ASSISTANT_API_URL = process.env.AI_ASSISTANT_API_URL || 'http://localhost:8000';
+const AI_ASSISTANT_API_URL = process.env.AI_ASSISTANT_API_URL || 'http://localhost:8001';
 const AI_ASSISTANT_API_TIMEOUT = parseInt(process.env.AI_ASSISTANT_API_TIMEOUT || '30000', 10);
 
 // System prompt for the hotel AI assistant

@@ -8,11 +8,17 @@ using LangGraph for workflow management.
 import logging
 from typing import Dict, List, Any, Optional, Callable, TypedDict, cast
 import json
+import os
 
 from langchain.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
+
+# Import local model support
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, BitsAndBytesConfig
+from langchain_huggingface import HuggingFacePipeline
+from langchain_core.language_models import BaseChatModel
 
 from .agents import BaseAgent, CheckInAgent, RoomServiceAgent, WellnessAgent
 from .schemas import AgentMessage, ConversationState
@@ -31,7 +37,59 @@ class SupervisorAgent:
         """
         self.name = "supervisor"
         self.model_name = model_name
-        self.llm = ChatOpenAI(model=model_name)
+        
+        # Always use the local quantized model
+        model, tokenizer = self.load_model()
+        
+        # Create a text generation pipeline
+        pipe = pipeline(
+            "text-generation",
+            model=model,
+            tokenizer=tokenizer,
+            max_new_tokens=2000,
+            temperature=0.7,
+            top_p=0.9,
+            top_k=50,
+            repetition_penalty=1.2
+        )
+        
+        # Create a LangChain wrapper around the pipeline
+        self.llm = HuggingFacePipeline(pipeline=pipe)
+        print("✅ Using local quantized model")
+    def load_model(self):
+        """Load the local model from the correct snapshot directory"""
+        # Get the root directory of the project (two levels up from the current script)
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(current_dir))
+        model_path = os.path.join(project_root, "finetunedmodel-merged")
+        
+        print(f"Loading model from: {model_path}")
+        print(f"Loading model from: {model_path}")
+        
+        # Load tokenizer
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_path,
+            trust_remote_code=True,
+            local_files_only=True  # Explicitly use local files only
+        )
+        
+        # Configure 8-bit quantization
+        quantization_config = BitsAndBytesConfig(
+            load_in_8bit=True,
+            llm_int8_enable_fp32_cpu_offload=True
+        )
+        
+        # Load model with quantization and CUDA support
+        model = AutoModelForCausalLM.from_pretrained(
+            model_path,
+            trust_remote_code=True,
+            local_files_only=True,  # Explicitly use local files only
+            quantization_config=quantization_config,  # Use BitsAndBytesConfig instead of load_in_8bit
+            device_map="auto"       # Automatically use CUDA if available
+        )
+        
+        print("✅ Model loaded successfully!")
+        return model, tokenizer
         
         # Create the prompt template for the supervisor
         self.prompt = ChatPromptTemplate.from_messages([
@@ -102,14 +160,20 @@ class SupervisorAgent:
         {json.dumps(state['messages'][:-1], indent=2) if len(state['messages']) > 1 else 'No previous messages'}
         """
         
-        # Get a response from the LLM
-        llm_response = await self.llm.ainvoke(
-            self.prompt.format(input=formatted_input)
-        )
+        # Format the prompt first
+        formatted_prompt = self.prompt.format(input=formatted_input)
+        
+        # Then invoke the LLM with the formatted prompt
+        llm_response = await self.llm.ainvoke(formatted_prompt)
         
         # Parse the response to get the agent name
         try:
-            response_content = llm_response.content
+            # Handle the response which might be a string or an object with a content attribute
+            if hasattr(llm_response, 'content'):
+                response_content = llm_response.content
+            else:
+                response_content = llm_response
+                
             response_json = json.loads(response_content)
             
             if "agent" in response_json:
