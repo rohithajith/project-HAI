@@ -18,6 +18,8 @@ pip install bitsandbytes-cuda110 bitsandbytes
 REM Install accelerate
 pip install accelerate
 pip install transformers
+pip install langchain
+pip install sentence-transformers
 pip install langgraph
 pip install pydantic-ai
 pip install fastapi
