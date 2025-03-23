@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 # Get configuration
 port = int(os.environ.get("PORT", 8001))
-host = os.environ.get("HOST", "0.0.0.0")
+host = os.environ.get("HOST", "127.0.0.1")
 reload = os.environ.get("DEBUG", "False").lower() == "true"
 
 if __name__ == "__main__":

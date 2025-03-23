@@ -15,7 +15,10 @@ from datetime import datetime
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
+import pathlib
 
 from .supervisor import create_hotel_supervisor
 from .schemas import ConversationState
@@ -132,9 +135,22 @@ async def chat(request: ChatRequest):
             agent_outputs=result["agent_outputs"]
         )
     
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON parsing error in chat message: {e}")
+        # Return a default response instead of raising an exception
+        return ChatResponse(
+            messages=[ChatMessage(role="assistant", content="I'm sorry, I encountered an error processing your request. Please try again.")],
+            conversation_id=conversation_id,
+            agent_outputs={}
+        )
     except Exception as e:
         logger.error(f"Error processing chat message: {e}")
-        raise HTTPException(status_code=500, detail=f"Error processing chat message: {str(e)}")
+        # Return a default response instead of raising an exception
+        return ChatResponse(
+            messages=[ChatMessage(role="assistant", content="I'm sorry, I encountered an error processing your request. Please try again.")],
+            conversation_id=conversation_id,
+            agent_outputs={}
+        )
 
 
 @app.websocket("/ws/{conversation_id}")
@@ -219,6 +235,18 @@ async def delete_conversation(conversation_id: str):
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy"}
+
+
+# Serve static files
+current_dir = pathlib.Path(__file__).parent.absolute()
+static_dir = current_dir / "static"
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+
+@app.get("/")
+async def get_index():
+    """Serve the index.html file."""
+    return FileResponse(str(static_dir / "index.html"))
 
 
 # Main entry point

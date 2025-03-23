@@ -55,40 +55,6 @@ class RoomServiceAgent(BaseAgent):
         # Create a LangChain wrapper around the pipeline
         self.llm = HuggingFacePipeline(pipeline=pipe)
         logger.info("✅ Using local quantized model")
-    
-    def load_model(self):
-        """Load the local model from the correct snapshot directory"""
-        # Get the root directory of the project (three levels up from the current script)
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
-        model_path = os.path.join(project_root, "finetunedmodel-merged")
-        
-        logger.info(f"Loading model from: {model_path}")
-        
-        # Load tokenizer
-        tokenizer = AutoTokenizer.from_pretrained(
-            model_path,
-            trust_remote_code=True,
-            local_files_only=True  # Explicitly use local files only
-        )
-        
-        # Configure 8-bit quantization
-        quantization_config = BitsAndBytesConfig(
-            load_in_8bit=True,
-            llm_int8_enable_fp32_cpu_offload=True
-        )
-        
-        # Load model with quantization and CUDA support
-        model = AutoModelForCausalLM.from_pretrained(
-            model_path,
-            trust_remote_code=True,
-            local_files_only=True,  # Explicitly use local files only
-            quantization_config=quantization_config,  # Use BitsAndBytesConfig instead of load_in_8bit
-            device_map="auto"       # Automatically use CUDA if available
-        )
-        
-        logger.info("✅ Model loaded successfully!")
-        return model, tokenizer
         
         # Create the prompt template
         self.prompt = ChatPromptTemplate.from_messages([
@@ -121,6 +87,41 @@ class RoomServiceAgent(BaseAgent):
             "sugar": True,
             "ice": True
         }
+    
+    def load_model(self):
+        """Load the local model from the correct snapshot directory"""
+        # Get the root directory of the project (three levels up from the current script)
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
+        model_path = os.path.join(project_root, "finetunedmodel-merged")
+        
+        logger.info(f"Loading model from: {model_path}")
+        
+        # Load tokenizer
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_path,
+            trust_remote_code=True,
+            local_files_only=True  # Explicitly use local files only
+        )
+        
+        # Configure 8-bit quantization (force GPU only)
+        quantization_config = BitsAndBytesConfig(
+            load_in_8bit=True,
+            llm_int8_enable_fp32_cpu_offload=False  # Disable CPU offload
+        )
+        
+        # Load model with 8-bit quantization on GPU only
+        model = AutoModelForCausalLM.from_pretrained(
+            model_path,
+            trust_remote_code=True,
+            local_files_only=True,  # Explicitly use local files only
+            device_map="cuda:0",  # Force GPU only
+            quantization_config=quantization_config,  # Use 8-bit quantization
+            low_cpu_mem_usage=True  # Optimize for low CPU memory usage
+        )
+        
+        logger.info("✅ Model loaded successfully!")
+        return model, tokenizer
     
     @property
     def input_schema(self) -> Type[AgentInput]:

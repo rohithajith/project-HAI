@@ -30,7 +30,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import ConsentManager from '../consent/ConsentManager';
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8001/api';
 
 /**
  * ChatbotInterface component for interacting with the hotel AI assistant

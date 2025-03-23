@@ -17,6 +17,8 @@ import SendIcon from '@mui/icons-material/Send';
 import { useTheme } from '@mui/material/styles';
 import axios from 'axios';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+
 const ChatbotButton = () => {
   const theme = useTheme();
   const [open, setOpen] = useState(false);
@@ -47,7 +49,7 @@ const ChatbotButton = () => {
     setLoading(true);
 
     try {
-      const response = await axios.post('/api/chatbot', {
+      const response = await axios.post(`${API_URL}/chatbot`, {
         message: input,
         history: messages.map(msg => ({ role: msg.role, content: msg.content }))
       });

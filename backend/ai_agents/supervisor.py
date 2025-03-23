@@ -55,41 +55,7 @@ class SupervisorAgent:
         
         # Create a LangChain wrapper around the pipeline
         self.llm = HuggingFacePipeline(pipeline=pipe)
-        print("✅ Using local quantized model")
-    def load_model(self):
-        """Load the local model from the correct snapshot directory"""
-        # Get the root directory of the project (two levels up from the current script)
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.dirname(os.path.dirname(current_dir))
-        model_path = os.path.join(project_root, "finetunedmodel-merged")
-        
-        print(f"Loading model from: {model_path}")
-        print(f"Loading model from: {model_path}")
-        
-        # Load tokenizer
-        tokenizer = AutoTokenizer.from_pretrained(
-            model_path,
-            trust_remote_code=True,
-            local_files_only=True  # Explicitly use local files only
-        )
-        
-        # Configure 8-bit quantization
-        quantization_config = BitsAndBytesConfig(
-            load_in_8bit=True,
-            llm_int8_enable_fp32_cpu_offload=True
-        )
-        
-        # Load model with quantization and CUDA support
-        model = AutoModelForCausalLM.from_pretrained(
-            model_path,
-            trust_remote_code=True,
-            local_files_only=True,  # Explicitly use local files only
-            quantization_config=quantization_config,  # Use BitsAndBytesConfig instead of load_in_8bit
-            device_map="auto"       # Automatically use CUDA if available
-        )
-        
-        print("✅ Model loaded successfully!")
-        return model, tokenizer
+        logger.info("✅ Using local quantized model")
         
         # Create the prompt template for the supervisor
         self.prompt = ChatPromptTemplate.from_messages([
@@ -105,21 +71,53 @@ class SupervisorAgent:
             
             Based on the user's message, select the most appropriate agent to handle the request.
             If the request doesn't clearly match any agent, ask clarifying questions to determine the user's needs.
+            Your response MUST be a valid JSON object with no additional text, whitespace, or formatting.
+            The JSON object should have an "agent" field with the name of the agent to handle the request,
+            and a "reason" field explaining why you selected this agent.
             
-            Your response should be a JSON object with the following format:
-            {
-                "agent": "agent_name",
-                "reason": "Brief explanation of why you selected this agent"
-            }
+            If you need to ask a clarifying question, set the "agent" field to "clarify" and include
+            a "question" field with your clarifying question.
             
-            If you need to ask a clarifying question, respond with:
-            {
-                "agent": "clarify",
-                "question": "Your clarifying question here"
-            }
+            Do not include any markdown formatting, code blocks, or additional text outside the JSON object.
+            The response must be a single line containing only the JSON object.
             """),
             ("human", "{input}")
         ])
+    
+    def load_model(self):
+        """Load the local model from the correct snapshot directory"""
+        # Get the root directory of the project (two levels up from the current script)
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(current_dir))
+        model_path = os.path.join(project_root, "finetunedmodel-merged")
+        
+        logger.info(f"Loading model from: {model_path}")
+        
+        # Load tokenizer
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_path,
+            trust_remote_code=True,
+            local_files_only=True  # Explicitly use local files only
+        )
+        
+        # Configure 8-bit quantization (force GPU only)
+        quantization_config = BitsAndBytesConfig(
+            load_in_8bit=True,
+            llm_int8_enable_fp32_cpu_offload=False  # Disable CPU offload
+        )
+        
+        # Load model with 8-bit quantization on GPU only
+        model = AutoModelForCausalLM.from_pretrained(
+            model_path,
+            trust_remote_code=True,
+            local_files_only=True,  # Explicitly use local files only
+            device_map="cuda:0",  # Force GPU only
+            quantization_config=quantization_config,  # Use 8-bit quantization
+            low_cpu_mem_usage=True  # Optimize for low CPU memory usage
+        )
+        
+        logger.info("✅ Model loaded successfully!")
+        return model, tokenizer
     
     def _create_agent_map(self) -> Dict[str, BaseAgent]:
         """Create a map of agent names to agent instances.
@@ -173,8 +171,26 @@ class SupervisorAgent:
                 response_content = llm_response.content
             else:
                 response_content = llm_response
-                
-            response_json = json.loads(response_content)
+            
+            # Clean up the response content to handle potential formatting issues
+            # First, try to find JSON-like content in the response
+            import re
+            json_match = re.search(r'(\{.*\})', response_content, re.DOTALL)
+            if json_match:
+                response_content = json_match.group(1)
+            
+            # Strip whitespace and try to parse the JSON
+            response_content = response_content.strip()
+            
+            try:
+                response_json = json.loads(response_content)
+            except json.JSONDecodeError:
+                # If JSON parsing fails, create a default response
+                logger.warning(f"Failed to parse JSON response: {response_content}")
+                response_json = {
+                    "agent": "supervisor",
+                    "reason": "Could not determine the appropriate agent"
+                }
             
             if "agent" in response_json:
                 agent_name = response_json["agent"]
