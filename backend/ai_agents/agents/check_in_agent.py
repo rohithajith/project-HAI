@@ -33,8 +33,7 @@ class CheckInAgent(BaseAgent):
             model_name: The name of the language model to use
         """
         super().__init__(
-            name="check_in_agent",
-            description="Handles guest check-ins, verifies ID and payment, and updates booking records"
+            name="check_in_agent"
         )
         
         # Always use the local quantized model

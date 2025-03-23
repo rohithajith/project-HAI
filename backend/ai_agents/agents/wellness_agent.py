@@ -34,8 +34,7 @@ class WellnessAgent(BaseAgent):
             model_name: The name of the language model to use
         """
         super().__init__(
-            name="wellness_agent",
-            description="Provides wellness services like guided meditation and breathing exercises"
+            name="wellness_agent"
         )
         
         # Always use the local quantized model

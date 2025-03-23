@@ -5,21 +5,26 @@ This script tests a single agent directly, without the full agent flow or the su
 """
 
 import asyncio
+import pytest
+import pytest
 import os
 import sys
 from datetime import datetime
 
-# Add the parent directory to the path so we can import the agent modules
+# Add the project root to the path so we can import the backend package
 current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-sys.path.append(parent_dir)
+project_root = os.path.dirname(current_dir)
+sys.path.append(project_root)
 
-# Use relative imports
-from agents.check_in_agent import CheckInAgent
-from agents.room_service_agent import RoomServiceAgent
-from agents.wellness_agent import WellnessAgent
-from schemas import AgentMessage, CheckInInput, RoomServiceInput, WellnessInput
+# Use absolute imports with package structure
+from backend.ai_agents.agents.check_in_agent import CheckInAgent
+from backend.ai_agents.agents.room_service_agent import RoomServiceAgent
+from backend.ai_agents.agents.wellness_agent import WellnessAgent
+from backend.ai_agents.schemas import AgentMessage, CheckInInput, RoomServiceInput, WellnessInput
 
+import pytest
+
+@pytest.mark.asyncio
 async def test_check_in_agent():
     """Test the CheckInAgent with a preset query."""
     print("\n--- Testing CheckInAgent ---")
@@ -70,6 +75,7 @@ async def test_check_in_agent():
         traceback.print_exc()
         return False
 
+@pytest.mark.asyncio
 async def test_room_service_agent():
     """Test the RoomServiceAgent with a preset query."""
     print("\n--- Testing RoomServiceAgent ---")
@@ -121,6 +127,7 @@ async def test_room_service_agent():
         traceback.print_exc()
         return False
 
+@pytest.mark.asyncio
 async def test_wellness_agent():
     """Test the WellnessAgent with a preset query."""
     print("\n--- Testing WellnessAgent ---")

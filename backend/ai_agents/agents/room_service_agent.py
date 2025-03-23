@@ -33,8 +33,7 @@ class RoomServiceAgent(BaseAgent):
             model_name: The name of the language model to use
         """
         super().__init__(
-            name="room_service_agent",
-            description="Handles room service requests for towels, pillows, and other amenities"
+            name="room_service_agent"
         )
         
         # Always use the local quantized model

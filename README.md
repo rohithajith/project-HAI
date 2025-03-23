@@ -203,6 +203,16 @@ erDiagram
 
 ## Testing Strategy
 
+### Running Unit Tests
+
+To run the unit tests for the backend AI agents, use the following command in the project root:
+
+```bash
+develop\Scripts\python.exe -m pytest backend/ai_agents/test_agent.py backend/ai_agents/test_single_agent.py
+```
+
+This command executes the pytest test runner, which will discover and run the tests in the specified files. The tests cover the functionality of the AI agents and ensure they are working as expected.
+
 ### Unit Testing
 - Test individual components and functions
 - Use Jest for JavaScript testing

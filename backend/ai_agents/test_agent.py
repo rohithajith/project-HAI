@@ -6,18 +6,19 @@ and processing correctly.
 """
 
 import asyncio
+import pytest
 import os
 import sys
 from datetime import datetime
 
-# Add the parent directory to the path so we can import the agent modules
+# Add the project root to the path so we can import the backend package
 current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-sys.path.append(parent_dir)
+project_root = os.path.dirname(current_dir)
+sys.path.append(project_root)
 
-# Use relative imports
-from supervisor import SupervisorAgent
-from schemas import AgentMessage, ConversationState
+# Use absolute imports with package structure
+from backend.ai_agents.supervisor import SupervisorAgent
+from backend.ai_agents.schemas import AgentMessage, ConversationState
 
 async def test_supervisor_agent():
     """Test the SupervisorAgent with a preset query."""
@@ -58,10 +59,11 @@ async def test_supervisor_agent():
         traceback.print_exc()
         return False
 
+@pytest.mark.asyncio
 async def test_direct_agent_flow():
     """Test a direct agent flow with a preset query."""
-    from agents.check_in_agent import CheckInAgent
-    from schemas import CheckInInput
+    from backend.ai_agents.agents.check_in_agent import CheckInAgent
+    from backend.ai_agents.schemas import CheckInInput
     
     print("Initializing CheckInAgent...")
     agent = CheckInAgent()
