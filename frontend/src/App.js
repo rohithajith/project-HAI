@@ -5,6 +5,7 @@ import Bookings from './pages/Bookings';
 import Notifications from './pages/Notifications';
 import Alerts from './pages/Alerts';
 import LandingPage from './pages/LandingPage';
+import GuestPage from './pages/GuestPage';
 import Layout from './components/common/Layout';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
@@ -43,6 +44,11 @@ function App() {
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/alerts" element={<Alerts />} />
             </Route>
+          </Route>
+          
+          {/* Protected routes for guest users */}
+          <Route element={<ProtectedRoute />}>
+            <Route path="/guest" element={<GuestPage />} />
           </Route>
           
           {/* Protected routes for staff and admin */}
