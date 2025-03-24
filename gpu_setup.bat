@@ -19,6 +19,9 @@ REM Install accelerate
 pip install accelerate
 pip install transformers
 pip install langchain
+pip install langchain_huggingface
+pip install langchain_community
+pip install langchain_openai
 pip install sentence-transformers
 pip install langgraph
 pip install pydantic-ai

@@ -1,4 +1,5 @@
 
+"""
 Hotel AI Assistant multi-agent system.
 
 This package implements a multi-agent system for a hotel assistant using LangGraph
