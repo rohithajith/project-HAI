@@ -2,15 +2,11 @@ import React from 'react';
 import { Box, Button, Typography, Grid, Paper, Container } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import ChatbotInterface from '../components/chatbot/ChatbotInterface';
 
 const LandingPage = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
-
-  const handleChatbotClick = () => {
-    // Placeholder for chatbot functionality
-    alert("Chatbot functionality will be implemented here.");
-  };
 
   const handleRoomControlClick = () => {
     // Placeholder for room control functionality
@@ -48,7 +44,7 @@ const LandingPage = () => {
         <Typography variant="h2" component="h1" gutterBottom align="center">
           Welcome to Hotel Management System
         </Typography>
-        
+
         <Typography variant="h5" component="h2" gutterBottom align="center" sx={{ mb: 4 }}>
           Enterprise-Level Hotel Management Solution
         </Typography>
@@ -103,7 +99,7 @@ const LandingPage = () => {
         <Typography variant="h4" component="h2" gutterBottom sx={{ mt: 4 }}>
           Guest Services
         </Typography>
-        
+
         <Grid container spacing={3} justifyContent="center">
           <Grid item xs={12} sm={6} md={4}>
             <Button
@@ -116,14 +112,7 @@ const LandingPage = () => {
             </Button>
           </Grid>
           <Grid item xs={12} sm={6} md={4}>
-            <Button
-              fullWidth
-              variant="contained"
-              size="large"
-              onClick={handleChatbotClick}
-            >
-              Chatbot
-            </Button>
+            <ChatbotInterface />
           </Grid>
           <Grid item xs={12} sm={6} md={4}>
             <Button

@@ -67,7 +67,7 @@ async function markAllNotificationsAsReadForRoom(roomNumber) {
     const unreadNotifications = notifications.filter(notification => !notification.is_read);
     
     // Mark each notification as read
-    const updatePromises = unreadNotifications.map(notification => 
+    const updatePromises = unreadNotifications.map(notification =>
       databaseService.markNotificationAsRead(notification.id)
     );
     
@@ -86,9 +86,53 @@ async function markAllNotificationsAsReadForRoom(roomNumber) {
   }
 }
 
+async function getAll() {
+  try {
+    return await databaseService.getAllNotifications();
+  } catch (error) {
+    console.error('Error getting all notifications:', error);
+    throw error;
+  }
+}
+
+async function getByRoom(roomNumber) {
+  try {
+    return await databaseService.getNotificationsByRoom(roomNumber);
+  } catch (error) {
+    console.error('Error getting notifications by room:', error);
+    throw error;
+  }
+}
+
+async function markAsRead(id) {
+  try {
+    return await databaseService.markNotificationAsRead(id);
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+    throw error;
+  }
+}
+
+async function createLaundryAlert(roomNumber, message) {
+  try {
+    return await databaseService.createNotification({
+      room_number: roomNumber,
+      message: message || 'Laundry service requested',
+      type: 'laundry'
+    });
+  } catch (error) {
+    console.error('Error creating laundry alert:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   sendRoomNotification,
   sendLaundryAlert,
   getUnreadNotifications,
-  markAllNotificationsAsReadForRoom
+  markAllNotificationsAsReadForRoom,
+  getAll,
+  getByRoom,
+  markAsRead,
+  createLaundryAlert
 };
