@@ -9,6 +9,7 @@ const bookingRoutes = require('./routes/bookingRoutes');
 const alertRoutes = require('./routes/alertRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const chatbotRoutes = require('./routes/chatbotRoutes');
+const hotelInfoRoutes = require('./routes/hotelInfoRoutes');
 
 // Initialize express app
 const app = express();
@@ -25,7 +26,8 @@ app.use('/api/bookings', bookingRoutes);
 app.use('/api/alerts', alertRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/chatbot', chatbotRoutes);
-
+app.use('/api/hotel-info', hotelInfoRoutes);
+app.get('/', (req, res) => { res.json({ message: 'Server is running' }); });
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../frontend/build')));

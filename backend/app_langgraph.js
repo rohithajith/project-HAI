@@ -14,6 +14,7 @@ const alertRoutes = require('./routes/alertRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const chatbotRoutes = require('./routes/chatbotRoutes');
 const chatbotLangGraphRoutes = require('./routes/chatbotRoutes_langgraph');
+const hotelInfoRoutes = require('./routes/hotelInfoRoutes');
 
 // Initialize express app
 const app = express();
@@ -29,6 +30,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/alerts', alertRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/hotel-info', hotelInfoRoutes);
 
 // Choose which chatbot implementation to use based on environment variable
 if (process.env.USE_LANGGRAPH_CHATBOT === 'true') {
