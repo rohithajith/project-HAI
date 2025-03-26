@@ -31,14 +31,15 @@ class TextProcessor:
         except LookupError:
             nltk.download('stopwords', quiet=True)
             
-        # Try to load spaCy model if available
+        # Load local finetuned model
         try:
-            import spacy
-            nlp = spacy.load("en_core_web_sm")
+            # Import and load the local finetuned model
+            from backend.ai_agents.models import load_finetuned_model
+            nlp = load_finetuned_model("finetuned_merged")
             SPACY_AVAILABLE = True
-        except (ImportError, OSError):
+        except Exception as e:
             SPACY_AVAILABLE = False
-            logger.warning("spaCy model not available. Some advanced features will be disabled.")
+            logger.warning(f"Local finetuned model not available: {e}. Some advanced features will be disabled.")
     except Exception as e:
         logger.warning(f"Error initializing NLP components: {e}")
         SPACY_AVAILABLE = False
