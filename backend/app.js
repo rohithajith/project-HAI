@@ -9,6 +9,7 @@ const bookingRoutes = require('./routes/bookingRoutes');
 const alertRoutes = require('./routes/alertRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const chatbotRoutes = require('./routes/chatbotRoutes');
+const adminBookingRoutes = require('./routes/adminBookingRoutes'); // Import admin booking routes
 
 // Initialize express app
 const app = express();
@@ -25,6 +26,7 @@ app.use('/api/bookings', bookingRoutes);
 app.use('/api/alerts', alertRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/chatbot', chatbotRoutes);
+app.use('/api/admin/bookings', adminBookingRoutes); // Mount admin booking routes
 
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {

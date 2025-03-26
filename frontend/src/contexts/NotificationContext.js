@@ -20,7 +20,7 @@ export const NotificationProvider = ({ children }) => {
     try {
       setLoading(true);
       const response = await notificationsApi.getAll();
-      setNotifications(response.data.data.notifications);
+      setNotifications(response.data);
       setError(null);
     } catch (err) {
       setError('Failed to fetch notifications');

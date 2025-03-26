@@ -177,9 +177,13 @@ async function createNotification(notification) {
  */
 async function getAllNotifications() {
   try {
-    return await db.all('SELECT * FROM notifications ORDER BY created_at DESC');
+    console.log('DatabaseService: getAllNotifications - start'); // Add start log
+    const notifications = await db.all('SELECT * FROM notifications ORDER BY created_at DESC');
+    console.log('DatabaseService: getAllNotifications - end');   // Add end log
+    return notifications;
   } catch (error) {
     console.error('Error getting all notifications:', error);
+    console.error('DatabaseService: getAllNotifications - error:', error); // Log error object
     throw error;
   }
 }

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Container, Box, CssBaseline } from '@mui/material';
 import Header from './Header';
-import ChatbotButton from '../chatbot/ChatbotButton';
+// Removed: import ChatbotButton from '../chatbot/ChatbotButton';
 
 const Layout = ({ children }) => {
   return (
@@ -11,7 +11,7 @@ const Layout = ({ children }) => {
       <Container component="main" sx={{ flexGrow: 1, py: 3 }}>
         {children}
       </Container>
-      <ChatbotButton />
+      {/* Removed: <ChatbotButton /> */}
       <Box
         component="footer"
         sx={{
