@@ -243,17 +243,21 @@ class WellnessAgent(BaseAgent):
         # Generate follow-up recommendations
         follow_up_recommendations = await self._generate_follow_up_recommendations(session_type, specific_session)
         
+        # Define actions
+        actions = [{
+            "type": "log_wellness_session",
+            "session_id": session_id,
+            "session_type": session_type,
+            "specific_session": specific_session,
+            "duration": duration,
+            "timestamp": datetime.now().isoformat()
+        }]
+        logger.info(f"WellnessAgent generated actions: {actions}") # Added for debugging
+        
         # Create and return the output
         return WellnessOutput(
             messages=[response_message],
-            actions=[{
-                "type": "log_wellness_session",
-                "session_id": session_id,
-                "session_type": session_type,
-                "specific_session": specific_session,
-                "duration": duration,
-                "timestamp": datetime.now().isoformat()
-            }],
+            actions=actions,
             status="completed",
             session_id=session_id,
             session_content=llm_response.content,

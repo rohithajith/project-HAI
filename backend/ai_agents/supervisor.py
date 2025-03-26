@@ -163,6 +163,7 @@ class SupervisorAgent:
         
         # Then invoke the LLM with the formatted prompt
         llm_response = await self.llm.ainvoke(formatted_prompt)
+        logger.info(f"Supervisor LLM raw response: {llm_response}") # Added for debugging
         
         # Parse the response to get the agent name
         try:

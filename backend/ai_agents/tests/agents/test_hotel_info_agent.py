@@ -6,10 +6,10 @@ import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
 import asyncio
 
-from agents.hotel_info_agent import HotelInfoAgent, HotelInfoInput, HotelInfoOutput
-from schemas.message import Message
-from rag.rag_module import RAGQuery, RAGResult
-from rag.vector_store import Document
+from backend.ai_agents.agents.hotel_info_agent import HotelInfoAgent, HotelInfoInput, HotelInfoOutput
+from backend.ai_agents.schemas.message import Message
+from backend.ai_agents.rag.rag_module import RAGQuery, RAGResult
+from backend.ai_agents.rag.vector_store import Document
 
 class TestHotelInfoAgent:
     """Test cases for the HotelInfoAgent class."""
@@ -34,7 +34,13 @@ class TestHotelInfoAgent:
     @pytest.fixture
     def hotel_info_agent(self, mock_rag_module):
         """Fixture to create a hotel information agent with a mocked RAG module."""
-        with patch('agents.hotel_info_agent.RAGModule', return_value=mock_rag_module):
+        # Patch all the RAG components for the fixture
+        with patch('backend.ai_agents.rag.rag_module.EmbeddingGenerator'), \
+             patch('backend.ai_agents.rag.rag_module.VectorStore'), \
+             patch('backend.ai_agents.rag.rag_module.Retriever'), \
+             patch('backend.ai_agents.rag.rag_module.TextProcessor'), \
+             patch('backend.ai_agents.rag.rag_module.RAGModule', return_value=mock_rag_module):
+            
             agent = HotelInfoAgent()
             agent.rag_module = mock_rag_module
             return agent

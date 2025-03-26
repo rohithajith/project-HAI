@@ -188,10 +188,14 @@ class CheckInAgent(BaseAgent):
             recipient="user"
         )
         
+        # Define actions
+        actions = [{"type": "update_booking", "booking_id": input_data.booking_id, "status": "checked_in"}] if check_in_status == "completed" else []
+        logger.info(f"CheckInAgent generated actions: {actions}") # Added for debugging
+        
         # Create and return the output
         return CheckInOutput(
             messages=[response_message],
-            actions=[{"type": "update_booking", "booking_id": input_data.booking_id, "status": "checked_in"}] if check_in_status == "completed" else [],
+            actions=actions,
             status=check_in_status,
             booking_details=booking_details,
             check_in_status=check_in_status,

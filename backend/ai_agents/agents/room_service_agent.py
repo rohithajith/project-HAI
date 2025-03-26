@@ -222,6 +222,8 @@ class RoomServiceAgent(BaseAgent):
                 "estimated_delivery_time": estimated_delivery_time.isoformat()
             })
         
+        logger.info(f"RoomServiceAgent generated actions: {actions}") # Added for debugging
+        
         # Create and return the output
         return RoomServiceOutput(
             messages=[response_message],

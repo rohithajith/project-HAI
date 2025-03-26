@@ -57,7 +57,10 @@ def test_direct_model_generation(model, tokenizer):
     test_queries = [
         "I'd like to check in to my room. My booking ID is BK12345.",
         "Can I get some extra towels and pillows delivered to room 301?",
-        "I'd like to do a guided meditation session."
+        "I'd like to do a guided meditation session.",
+        "When is check-in and check-out time?",
+        "Where is the parking located?",
+        "Is there an iron box in the room? Where can I find it?"
     ]
     
     for query in test_queries:
