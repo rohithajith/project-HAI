@@ -111,19 +111,31 @@ async def run_rag_status():
 async def main():
     """Main function."""
     args = parse_args()
+    input_json_str = None
     
+    # Read input from stdin if --input argument is not provided
+    if args.input:
+        input_json_str = args.input
+    else:
+        # Check if stdin has data (to avoid blocking if not piped)
+        if not sys.stdin.isatty():
+            input_json_str = sys.stdin.read()
+        else:
+             logger.error("Input must be provided either via --input argument or stdin pipe.")
+             sys.exit(1)
+
     # Determine which agent to run
     if args.agent == "hotel_info":
-        if not args.input:
-            logger.error("Input is required for hotel_info agent")
+        if not input_json_str:
+            logger.error("Input JSON string is empty.")
             sys.exit(1)
         
         try:
-            input_data = json.loads(args.input)
+            input_data = json.loads(input_json_str)
             result = await run_hotel_info_agent(input_data)
             print(json.dumps(result))
         except json.JSONDecodeError:
-            logger.error(f"Invalid JSON input: {args.input}")
+            logger.error(f"Invalid JSON input received: {input_json_str[:500]}...") # Log truncated input
             sys.exit(1)
     elif args.agent == "rag_status":
         result = await run_rag_status()

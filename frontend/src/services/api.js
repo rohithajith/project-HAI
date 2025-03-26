@@ -37,6 +37,11 @@ export const notificationsApi = {
   sendLaundryAlert: (roomNumber) => api.post('/notifications/laundry', { room_number: roomNumber }),
 };
 
+// Chatbot API
+export const chatbotApi = {
+  sendMessage: (chatData) => api.post('/chatbot', chatData),
+};
+
 export default {
   bookings: bookingsApi,
   alerts: alertsApi,

@@ -31,17 +31,19 @@ def load_model_and_tokenizer(model_path, cache_dir):
         device = "cuda" if torch.cuda.is_available() else "cpu"
         logger.info(f"Loading model on {device} from: {model_path}")
 
-        # Convert to forward-slash path for Hugging Face compatibility
-        model_path = Path(model_path).resolve().as_posix()
-        cache_dir = Path(cache_dir).resolve().as_posix()
+        # Use the provided model_path and cache_dir directly (should be relative)
+        # model_path = Path(model_path).resolve().as_posix() # Removed
+        # cache_dir = Path(cache_dir).resolve().as_posix() # Removed
 
+        # logger.info(f"Attempting to load tokenizer from local path: '{model_path}' with cache_dir: '{cache_dir}'") # Removed log
         tokenizer = AutoTokenizer.from_pretrained(
-            pretrained_model_name_or_path=model_path,
+            pretrained_model_name_or_path=model_path, # Use relative path directly
             cache_dir=cache_dir,
             local_files_only=True
         )
+        # logger.info(f"Attempting to load model from local path: '{model_path}' with cache_dir: '{cache_dir}'") # Removed log
         model = AutoModelForCausalLM.from_pretrained(
-            pretrained_model_name_or_path=model_path,
+            pretrained_model_name_or_path=model_path, # Use relative path directly
             cache_dir=cache_dir,
             local_files_only=True,
             torch_dtype=torch.float16 if device == "cuda" else None,

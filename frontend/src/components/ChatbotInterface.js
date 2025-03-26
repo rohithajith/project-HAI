@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { notificationsApi } from '../services/api';
+import { chatbotApi } from '../services/api'; // Import chatbotApi
 import './ChatbotInterface.css';
 
 const ChatbotInterface = ({ roomNumber, onServiceRequest }) => {
@@ -21,9 +21,10 @@ const ChatbotInterface = ({ roomNumber, onServiceRequest }) => {
     setIsTyping(true);
 
     try {
-      const response = await notificationsApi.create({
+      // Call the correct chatbot API endpoint
+      const response = await chatbotApi.sendMessage({
         message: inputText,
-        queryType: "chat",
+        // queryType: "chat", // Removed, likely not needed for chatbot endpoint
         roomNumber,
         history: messages
           .filter(msg => msg.sender === 'user' || msg.sender === 'bot')

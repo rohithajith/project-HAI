@@ -31,16 +31,18 @@ class GuestRequestAgent:
             'towels': 'towel_request',
             'clean': 'cleaning_request',
             'room service': 'room_service',
-            'wake-up': 'wakeup_call'
+            'wake-up': 'wakeup_call',
+            'wake up': 'wakeup_call' # Added keyword without hyphen
         }
 
-        base_dir = Path(__file__).resolve().parent.parent
-        model_path = base_dir / "finetunedmodel-merged"
-        cache_dir = base_dir / "models"
+        # Use relative path from project root (where scripts are usually run)
+        model_path = "finetunedmodel-merged" # Corrected path - model is in project root
+        # Cache dir can still be absolute or relative, let's keep it relative for consistency
+        cache_dir = "backend/models" # Cache can stay within backend
 
         self.model, self.tokenizer, self.device = load_model_and_tokenizer(
-            str(model_path),
-            str(cache_dir)
+            model_path,
+            cache_dir
         )
 
     def process_request(self, message: str, history: list = None) -> Dict[str, Any]:
@@ -49,14 +51,18 @@ class GuestRequestAgent:
             # Generate initial response
             prompt = format_prompt(message, json.dumps(history) if history else None)
             response = generate_response(self.model, self.tokenizer, prompt, self.device)
-            
+
             # Check for service keywords
-            service_type = next(
-                (service for keyword, service in self.service_keywords.items() 
-                 if keyword in message.lower()),
-                None
-            )
-            
+            lower_message = message.lower() # Store lowercase message
+            self.logger.info(f"Checking message: '{lower_message}'") # Log message
+            service_type = None
+            for keyword, service in self.service_keywords.items():
+                match = keyword in lower_message
+                self.logger.info(f"  - Checking keyword '{keyword}': {match}") # Log each check
+                if match:
+                    service_type = service
+                    break # Found a match, stop checking
+
             # Prepare output
             output = {
                 'response': response,

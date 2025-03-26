@@ -1,4 +1,4 @@
-const { exec } = require('child_process');
+const { spawn } = require('child_process'); // Use spawn instead of exec
 const path = require('path');
 const fs = require('fs');
 const NotificationService = require('../services/notificationService');
@@ -11,7 +11,8 @@ const SYSTEM_PROMPT = 'You are a helpful hotel AI which acts like hotel receptio
  */
 const processMessage = async (req, res) => {
   try {
-    const { message, history = [], roomNumber, guestId } = req.body;
+    // Provide default null for guestId if not sent
+    const { message, history = [], roomNumber, guestId = null } = req.body;
 
     if (!message) {
       return res.status(400).json({ error: 'Message is required' });
@@ -52,21 +53,49 @@ const processMessage = async (req, res) => {
         room_number: roomNumber
       };
 
+      // Use spawn to execute Python script and pipe data via stdin
       agentResult = await new Promise((resolve, reject) => {
-        exec(
-          `python "${scriptPath}" --agent hotel_info --input '${JSON.stringify(inputData)}'`,
-          (error, stdout, stderr) => {
-            if (error) {
-              console.error(`Error executing AI agent: ${error.message}`);
-              reject(error);
-            }
+        const pythonProcess = spawn('python', [scriptPath, '--agent', 'hotel_info']);
+        let stdoutData = '';
+        let stderrData = '';
+
+        // Write JSON data to stdin
+        pythonProcess.stdin.write(JSON.stringify(inputData));
+        pythonProcess.stdin.end();
+
+        // Collect stdout
+        pythonProcess.stdout.on('data', (data) => {
+          stdoutData += data.toString();
+        });
+
+        // Collect stderr
+        pythonProcess.stderr.on('data', (data) => {
+          stderrData += data.toString();
+        });
+
+        // Handle process exit
+        pythonProcess.on('close', (code) => {
+          if (code !== 0) {
+            console.error(`Python script exited with code ${code}`);
+            console.error(`Stderr: ${stderrData}`);
+            reject(new Error(`Python script failed with code ${code}: ${stderrData}`));
+          } else {
             try {
-              resolve(JSON.parse(stdout));
+              // Parse the JSON output from stdout
+              resolve(JSON.parse(stdoutData));
             } catch (e) {
-              reject(e);
+              console.error(`Error parsing Python script output: ${e}`);
+              console.error(`Stdout: ${stdoutData}`);
+              reject(new Error(`Failed to parse JSON output from Python script: ${e}`));
             }
           }
-        );
+        });
+
+        // Handle spawn errors
+        pythonProcess.on('error', (error) => {
+          console.error(`Failed to start Python script: ${error.message}`);
+          reject(error);
+        });
       });
     }
 

@@ -17,13 +17,18 @@ const GuestPortal = () => {
     // Fetch initial room data
     const fetchRoomData = async () => {
       try {
-        const response = await bookingsApi.create({
-          message: "Get room data",
-          queryType: "room_data"
-        });
-        setRoomData(response.data);
+        // Use getCurrent() instead of non-existent create()
+        const response = await bookingsApi.getCurrent();
+        // Merge response data with existing state, ensuring services is always an array
+        setRoomData(prevData => ({
+          ...prevData, // Keep existing state
+          ...(response.data || {}), // Merge response data (if any)
+          services: response.data?.services || prevData.services || [] // Ensure services is an array
+        }));
       } catch (error) {
         console.error('Error fetching room data:', error);
+        // Optionally set default state on error
+        // setRoomData(prevData => ({ ...prevData, services: prevData.services || [] }));
       }
     };
 
@@ -32,10 +37,11 @@ const GuestPortal = () => {
 
   const handleTempChange = async (newTemp) => {
     try {
-      await bookingsApi.create({
-        request: `Set temperature to ${newTemp}°C`
-      });
-      setRoomData(prev => ({ ...prev, temperature: newTemp }));
+      // TODO: Implement backend endpoint for setting temperature
+      // await bookingsApi.create({ // Commented out - 'create' doesn't exist
+      //   request: `Set temperature to ${newTemp}°C`
+      // });
+      setRoomData(prev => ({ ...prev, temperature: newTemp })); // Update local state only for now
     } catch (error) {
       console.error('Error setting temperature:', error);
     }
