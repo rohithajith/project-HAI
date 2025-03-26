@@ -2,6 +2,19 @@ const databaseService = require('./databaseService');
 const socketService = require('./socketService');
 
 /**
+ * Get all notifications
+ * @returns {Promise<Array>} Array of notification objects
+ */
+async function getAll() {
+  try {
+    return await databaseService.getAllNotifications();
+  } catch (error) {
+    console.error('Error getting all notifications:', error);
+    throw error;
+  }
+}
+
+/**
  * Send a notification to a specific room
  * @param {string} roomNumber - Room number
  * @param {string} message - Notification message
@@ -46,7 +59,6 @@ async function sendLaundryAlert(roomNumber) {
  */
 async function getUnreadNotifications() {
   try {
-    // Use databaseService instead of direct db access
     const allNotifications = await databaseService.getAllNotifications();
     return allNotifications.filter(notification => !notification.is_read);
   } catch (error) {
@@ -87,6 +99,7 @@ async function markAllNotificationsAsReadForRoom(roomNumber) {
 }
 
 module.exports = {
+  getAll,
   sendRoomNotification,
   sendLaundryAlert,
   getUnreadNotifications,

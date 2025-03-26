@@ -1,8 +1,5 @@
 """
-Utilities package for the Hotel AI Assistant.
-
-This package contains utility functions and classes used throughout
-the application.
+Utility functions for the AI agents system
 """
 
 import json
@@ -16,7 +13,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger("ai_agents_utils")
 
-# Utility function
 def notify_admin_dashboard(guest_request):
     """Send notification to admin dashboard about guest request"""
     try:
@@ -29,23 +25,3 @@ def notify_admin_dashboard(guest_request):
     except Exception as e:
         logger.error(f"Error notifying admin dashboard: {e}")
         return False
-
-# Dummy utility functions (if you still use these elsewhere)
-def generate_id(): pass
-def format_datetime(): pass
-def anonymize_pii(): pass
-def extract_entities(): pass
-def parse_json_safely(): pass
-def truncate_text(): pass
-def calculate_similarity(): pass
-
-__all__ = [
-    'generate_id',
-    'format_datetime',
-    'anonymize_pii',
-    'extract_entities',
-    'parse_json_safely',
-    'truncate_text',
-    'calculate_similarity',
-    'notify_admin_dashboard'
-]

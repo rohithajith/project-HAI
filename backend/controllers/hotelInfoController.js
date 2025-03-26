@@ -165,6 +165,165 @@ exports.initializeRag = async (req, res) => {
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
+exports.handleTowelRequest = async (req, res) => {
+    try {
+        const { request } = req.body;
+        
+        if (!request) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Request is required'
+            });
+        }
+
+        logger.info(`Towel request received: ${request.substring(0, 50)}...`);
+
+        // Here you would typically:
+        // 1. Create a task in your task management system
+        // 2. Send a notification to housekeeping
+        // 3. Log the request in your database
+        
+        return res.status(200).json({
+            status: 'success',
+            message: 'Towel request processed successfully',
+            request: request
+        });
+    } catch (error) {
+        logger.error(`Towel request error: ${error.message}`);
+        
+        return res.status(500).json({
+            status: 'error',
+            message: 'Error processing towel request',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Get room data information
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.getRoomData = async (req, res) => {
+  try {
+    // Call the Python room service agent
+    const pythonProcess = spawn('python', [
+      path.join(__dirname, '../ai_agents/run.py'),
+      '--agent', 'room_service',
+      '--input', JSON.stringify(req.body)
+    ]);
+
+    let outputData = '';
+    let errorData = '';
+
+    pythonProcess.stdout.on('data', (data) => {
+      outputData += data.toString();
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+      errorData += data.toString();
+      logger.error(`Room data error: ${data.toString()}`);
+    });
+
+    pythonProcess.on('close', (code) => {
+      if (code !== 0) {
+        return res.status(500).json({
+          status: 'error',
+          message: 'Error getting room data',
+          error: errorData
+        });
+      }
+
+      try {
+        const output = JSON.parse(outputData);
+        return res.status(200).json({
+          status: 'success',
+          data: output
+        });
+      } catch (error) {
+        return res.status(500).json({
+          status: 'error',
+          message: 'Error parsing room data response',
+          error: error.message
+        });
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: 'error',
+      message: 'Error processing room data request',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Handle chat requests
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.handleChat = async (req, res) => {
+  try {
+    const { message } = req.body;
+    
+    if (!message) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Message is required'
+      });
+    }
+
+    // Call the Python hotel info agent
+    const pythonProcess = spawn('python', [
+      path.join(__dirname, '../ai_agents/run.py'),
+      '--agent', 'hotel_info',
+      '--input', JSON.stringify({ latest_message: message })
+    ]);
+
+    let outputData = '';
+    let errorData = '';
+
+    pythonProcess.stdout.on('data', (data) => {
+      outputData += data.toString();
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+      errorData += data.toString();
+      logger.error(`Chat error: ${data.toString()}`);
+    });
+
+    pythonProcess.on('close', (code) => {
+      if (code !== 0) {
+        return res.status(500).json({
+          status: 'error',
+          message: 'Error processing chat request',
+          error: errorData
+        });
+      }
+
+      try {
+        const output = JSON.parse(outputData);
+        return res.status(200).json({
+          status: 'success',
+          data: output
+        });
+      } catch (error) {
+        return res.status(500).json({
+          status: 'error',
+          message: 'Error parsing chat response',
+          error: error.message
+        });
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: 'error',
+      message: 'Error processing chat request',
+      error: error.message
+    });
+  }
+};
+
 exports.getRagStatus = async (req, res) => {
   try {
     // Call the Python script to check RAG status
