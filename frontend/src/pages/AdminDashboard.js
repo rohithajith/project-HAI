@@ -1,49 +1,36 @@
 import React from 'react';
-import AdminBookings from '../components/admin/AdminBookings'; // Import the new component
-// Import necessary components for tabs later
-// import Bookings from './Bookings'; // Assuming Bookings component exists or will be created
-// import Services from '../components/admin/Services'; // Example path
-// import Settings from '../components/admin/Settings'; // Example path
-// import Chatbot from '../components/common/Chatbot'; // Example path
+import AdminNotificationList from '../components/notifications/AdminNotificationList';
+// Import other admin components as needed, e.g., for bookings
+// import AdminBookings from '../components/admin/AdminBookings';
+import './DashboardStyles.css'; // Use shared dashboard styles
 
-const AdminDashboard = () => {
-  // State to manage active tab, e.g., 'bookings', 'services', 'settings', 'chatbot'
-  const [activeTab, setActiveTab] = React.useState('bookings');
-
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case 'bookings':
-        return <AdminBookings />; // Use the imported component
-      case 'services':
-        // return <Services />;
-        return <div>Services Content (To be implemented)</div>;
-      case 'settings':
-        // return <Settings />;
-        return <div>Settings Content (To be implemented)</div>;
-      case 'chatbot':
-        // return <Chatbot />;
-        return <div>Chatbot Interface (To be implemented)</div>;
-      default:
-        return <div>Bookings Content (To be implemented)</div>;
-    }
-  };
-
+function AdminDashboard() {
   return (
-    <div>
-      <h1>Admin Dashboard</h1>
-      <nav>
-        {/* Basic tab navigation */}
-        <button onClick={() => setActiveTab('bookings')} disabled={activeTab === 'bookings'}>Bookings</button>
-        <button onClick={() => setActiveTab('services')} disabled={activeTab === 'services'}>Services</button>
-        <button onClick={() => setActiveTab('settings')} disabled={activeTab === 'settings'}>Settings</button>
-        <button onClick={() => setActiveTab('chatbot')} disabled={activeTab === 'chatbot'}>Chatbot</button>
-        {/* Add SOS Alert indicator if needed based on sketch */}
-      </nav>
-      <div className="tab-content">
-        {renderTabContent()}
-      </div>
+    <div className="dashboard-container">
+      <header className="dashboard-header">
+        <h1>Admin Dashboard</h1>
+        <p>System Overview and Notifications</p>
+      </header>
+      <main className="dashboard-content">
+        {/* Section for real-time notifications */}
+        <AdminNotificationList />
+
+        {/* Placeholder for other admin sections like booking management */}
+        {/* <section className="card">
+          <h2 className="card-header">Booking Management</h2>
+          <div style={{padding: '1rem'}}>
+             <AdminBookings /> // Example component
+          </div>
+        </section> */}
+
+        {/* Add more sections as needed */}
+
+      </main>
+      <footer className="dashboard-footer">
+        Hotel AI Management System - Admin Panel
+      </footer>
     </div>
   );
-};
+}
 
 export default AdminDashboard;

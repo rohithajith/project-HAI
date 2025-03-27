@@ -1,71 +1,48 @@
-import React, { useState } from 'react';
-import { Box, Container, Tabs, Tab, Typography } from '@mui/material';
-import RoomControl from '../components/guest/RoomControl';
+import React from 'react';
+import { Box, Container, Typography, Paper } from '@mui/material';
+// import RoomControl from '../components/guest/RoomControl'; // Keep commented until reviewed
 import GuestChatbot from '../components/guest/GuestChatbot';
-import { useAuth } from '../contexts/AuthContext'; // Assuming guest auth uses the same context for now
-
-// TabPanel component (same as used in previous LandingPage)
-function TabPanel(props) {
-  const { children, value, index, ...other } = props;
-
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`guest-tabpanel-${index}`}
-      aria-labelledby={`guest-tab-${index}`}
-      {...other}
-    >
-      {value === index && (
-        <Box sx={{ pt: 3 }}>
-          {children}
-        </Box>
-      )}
-    </div>
-  );
-}
-
-function a11yProps(index) {
-  return {
-    id: `guest-tab-${index}`,
-    'aria-controls': `guest-tabpanel-${index}`,
-  };
-}
+import { useAuth } from '../contexts/AuthContext';
 
 const GuestPage = () => {
-  const [activeTab, setActiveTab] = useState(0); // 0 for Room Control, 1 for Chatbot
   const { currentUser } = useAuth(); // Get current user info if needed
-
-  const handleTabChange = (event, newValue) => {
-    setActiveTab(newValue);
-  };
 
   // Add logout functionality if needed
   // const handleLogout = () => { ... };
 
   return (
-    <Container maxWidth="md" sx={{ mt: 4 }}>
-      <Typography variant="h4" component="h1" gutterBottom align="center">
-        Guest Services
+    <Container maxWidth="md" sx={{ mt: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', height: 'calc(100vh - 64px)', // Adjust based on header height if Layout is used
+      paddingBottom: '2rem' }}>
+      <Typography variant="h4" component="h1" gutterBottom align="center" sx={{ color: '#004466' }}>
+        Your Personal Concierge
       </Typography>
       {currentUser && (
-         <Typography variant="subtitle1" align="center" gutterBottom>
-           Welcome, {currentUser.firstName}! {/* Display guest name */}
+         <Typography variant="subtitle1" align="center" gutterBottom sx={{ mb: 2, color: '#555' }}>
+           Welcome, {currentUser.firstName}! How can I assist you today?
          </Typography>
       )}
-      <Box sx={{ width: '100%', borderBottom: 1, borderColor: 'divider' }}>
-        <Tabs value={activeTab} onChange={handleTabChange} aria-label="Guest service tabs" centered>
-          <Tab label="Room Control" {...a11yProps(0)} />
-          <Tab label="Chatbot" {...a11yProps(1)} />
-        </Tabs>
-      </Box>
-      <TabPanel value={activeTab} index={0}>
-        <RoomControl />
-      </TabPanel>
-      <TabPanel value={activeTab} index={1}>
+
+      {/* Make Chatbot the primary element, styled within a Paper component */}
+      <Paper elevation={3} sx={{
+          width: '100%',
+          maxWidth: '800px', // Limit chatbot width
+          flexGrow: 1, // Allow chatbot to take available vertical space
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden', // Ensure chatbot content stays within Paper
+          bgcolor: '#ffffff' // White background for the chat area
+      }}>
         <GuestChatbot />
-      </TabPanel>
+      </Paper>
+
+      {/* Temporarily commented out RoomControl - review its content */}
+      {/* <Box sx={{ width: '100%', mt: 4 }}>
+        <Typography variant="h6" gutterBottom>Room Controls</Typography>
+        <RoomControl />
+      </Box> */}
+
       {/* Add Logout button here if desired */}
+      {/* Example: <Button variant="outlined" onClick={handleLogout} sx={{ mt: 4 }}>Logout</Button> */}
     </Container>
   );
 };
