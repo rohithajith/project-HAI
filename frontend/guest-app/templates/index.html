@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guest Chatbot - Hotel AI</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        
+        .card {
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .chatbox {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #f9f9f9;
+        }
+        
+        .message {
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 10px;
+            max-width: 70%;
+        }
+        
+        .user {
+            background-color: #DCF8C6;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+        
+        .bot {
+            background-color: #E5E5EA;
+            align-self: flex-start;
+        }
+        
+        .agent-action {
+            background-color: #FFD700;
+            align-self: flex-start;
+            font-style: italic;
+        }
+        
+        .input-area {
+            display: flex;
+            margin-top: 10px;
+        }
+        
+        .input-area input {
+            flex-grow: 1;
+            margin-right: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 15px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        .message-container {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .room-input {
+            margin-bottom: 20px;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        
+        .status-indicator.online {
+            background-color: #4CAF50;
+        }
+        
+        .status-indicator.offline {
+            background-color: #f44336;
+        }
+        
+        .connection-status {
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Guest Chatbot</h1>
+        
+        <div class="card">
+            <div class="connection-status">
+                <span class="status-indicator offline" id="connection-indicator"></span>
+                <span id="connection-status">Disconnected</span>
+            </div>
+            
+            <div class="room-input">
+                <label for="room-number">Your Room Number:</label>
+                <input type="text" id="room-number" placeholder="Enter your room number">
+            </div>
+            
+            <div class="chatbox" id="chatbox">
+                <div class="message-container" id="message-container">
+                    <div class="message bot">Welcome to Hotel AI! How can I assist you today?</div>
+                </div>
+            </div>
+            
+            <div class="input-area">
+                <input 
+                    type="text" 
+                    id="message-input" 
+                    placeholder="Type your message..." 
+                    autocomplete="off"
+                >
+                <button id="send-button">Send</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const chatbox = document.getElementById('chatbox');
+            const messageContainer = document.getElementById('message-container');
+            const messageInput = document.getElementById('message-input');
+            const sendButton = document.getElementById('send-button');
+            const roomNumberInput = document.getElementById('room-number');
+            const connectionIndicator = document.getElementById('connection-indicator');
+            const connectionStatus = document.getElementById('connection-status');
+            
+            let messageHistory = [];
+            
+            // Initialize Socket.IO - connect to backend server
+            const socket = io('{{ backend_url }}', {
+                transports: ['websocket', 'polling'],
+                path: '/socket.io'
+            });
+            
+            // Socket.IO event handlers
+            socket.on('connect', () => {
+                console.log('Connected to server');
+                connectionIndicator.classList.remove('offline');
+                connectionIndicator.classList.add('online');
+                connectionStatus.textContent = 'Connected';
+                addMessage('Connected to server', 'bot');
+            });
+            
+            socket.on('connect_error', (error) => {
+                console.log('Connection error:', error);
+                connectionIndicator.classList.remove('online');
+                connectionIndicator.classList.add('offline');
+                connectionStatus.textContent = 'Connection Error';
+                addMessage('Connection error. Please try again.', 'bot');
+            });
+            
+            socket.on('disconnect', () => {
+                console.log('Disconnected from server');
+                connectionIndicator.classList.remove('online');
+                connectionIndicator.classList.add('offline');
+                connectionStatus.textContent = 'Disconnected';
+                addMessage('Disconnected from server', 'bot');
+            });
+            
+            socket.on('message', (data) => {
+                console.log('Message from server:', data);
+                if (data.response) {
+                    addMessage(data.response, 'bot');
+                    messageHistory.push({
+                        role: 'assistant',
+                        content: data.response
+                    });
+                }
+                if (data.notifications && data.notifications.length > 0) {
+                    data.notifications.forEach(notification => {
+                        addMessage(`Notification: ${notification}`, 'agent-action');
+                    });
+                }
+            });
+            
+            // Add message to chatbox
+            function addMessage(text, sender) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${sender}`;
+                messageDiv.textContent = text;
+                messageContainer.appendChild(messageDiv);
+                
+                // Scroll to bottom
+                chatbox.scrollTop = chatbox.scrollHeight;
+            }
+            
+            // Send message
+            function sendMessage() {
+                const messageText = messageInput.value.trim();
+                const roomNumber = roomNumberInput.value.trim();
+                
+                if (messageText) {
+                    // Add user message to chat
+                    addMessage(messageText, 'user');
+                    
+                    // Add room context if available
+                    let messageToSend = messageText;
+                    if (roomNumber) {
+                        if (!messageText.toLowerCase().includes('room')) {
+                            messageToSend = `I am in room ${roomNumber}. ${messageText}`;
+                        }
+                    }
+                    
+                    // Add to message history
+                    messageHistory.push({
+                        role: 'user',
+                        content: messageToSend
+                    });
+                    
+                    // Send to server
+                    socket.emit('message', {
+                        message: messageToSend,
+                        history: messageHistory
+                    });
+                    
+                    // Clear input
+                    messageInput.value = '';
+                }
+            }
+            
+            // Event listeners
+            sendButton.addEventListener('click', sendMessage);
+            
+            messageInput.addEventListener('keypress', function(event) {
+                if (event.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+        });
+    </script>
+</body>
+</html>

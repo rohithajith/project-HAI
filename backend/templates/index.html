@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block title %}Guest Chatbot - Hotel AI{% endblock %}
+
+{% block styles %}
+.chatbox {
+    height: 400px;
+    overflow-y: auto;
+    border: 1px solid #ccc;
+    padding: 10px;
+    margin-bottom: 10px;
+    background-color: #f9f9f9;
+}
+
+.message {
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    max-width: 70%;
+}
+
+.user {
+    background-color: #DCF8C6;
+    align-self: flex-end;
+    margin-left: auto;
+}
+
+.bot {
+    background-color: #E5E5EA;
+    align-self: flex-start;
+}
+
+.agent-action {
+    background-color: #FFD700;
+    align-self: flex-start;
+    font-style: italic;
+}
+
+.input-area {
+    display: flex;
+    margin-top: 10px;
+}
+
+.input-area input {
+    flex-grow: 1;
+    margin-right: 10px;
+}
+
+.message-container {
+    display: flex;
+    flex-direction: column;
+}
+
+.room-input {
+    margin-bottom: 20px;
+}
+{% endblock %}
+
+{% block content %}
+<h1>Guest Chatbot</h1>
+<div class="card">
+    <div class="room-input">
+        <label for="room-number">Your Room Number:</label>
+        <input type="text" id="room-number" placeholder="Enter your room number">
+    </div>
+    
+    <div class="chatbox" id="chatbox">
+        <div class="message-container" id="message-container">
+            <div class="message bot">Welcome to Hotel AI! How can I assist you today?</div>
+        </div>
+    </div>
+    
+    <div class="input-area">
+        <input 
+            type="text" 
+            id="message-input" 
+            placeholder="Type your message..." 
+            autocomplete="off"
+        >
+        <button id="send-button">Send</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const chatbox = document.getElementById('chatbox');
+        const messageContainer = document.getElementById('message-container');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const roomNumberInput = document.getElementById('room-number');
+        
+        let socket = null;
+        let messageHistory = [];
+        
+        // Connect to WebSocket
+        function connectWebSocket() {
+            // Close existing socket if any
+            if (socket) {
+                socket.close();
+            }
+            
+            // Create new WebSocket connection
+            socket = new WebSocket('ws://localhost:8000/ws/guest');
+            
+            socket.onopen = function(event) {
+                console.log('WebSocket connection established');
+                addMessage('Connected to server.', 'bot');
+            };
+            
+            socket.onmessage = function(event) {
+                console.log('Message from server:', event.data);
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'notification') {
+                        addMessage(`Notification: ${JSON.stringify(data.payload)}`, 'agent-action');
+                    } else if (data.response) {
+                        addMessage(data.response, 'bot');
+                        // Add to message history
+                        messageHistory.push({
+                            role: 'assistant',
+                            content: data.response
+                        });
+                    } else {
+                        addMessage(JSON.stringify(data), 'bot');
+                    }
+                } catch (e) {
+                    addMessage(event.data, 'bot');
+                }
+            };
+            
+            socket.onerror = function(error) {
+                console.error('WebSocket error:', error);
+                addMessage('WebSocket error. Check console.', 'bot');
+            };
+            
+            socket.onclose = function(event) {
+                console.log('WebSocket connection closed');
+                addMessage('Connection closed. Attempting to reconnect...', 'bot');
+                // Try to reconnect after 5 seconds
+                setTimeout(connectWebSocket, 5000);
+            };
+        }
+        
+        // Add message to chatbox
+        function addMessage(text, sender) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            messageDiv.textContent = text;
+            messageContainer.appendChild(messageDiv);
+            
+            // Scroll to bottom
+            chatbox.scrollTop = chatbox.scrollHeight;
+        }
+        
+        // Send message
+        function sendMessage() {
+            const messageText = messageInput.value.trim();
+            const roomNumber = roomNumberInput.value.trim();
+            
+            if (messageText) {
+                // Add user message to chat
+                addMessage(messageText, 'user');
+                
+                // Add room context if available
+                let messageToSend = messageText;
+                if (roomNumber) {
+                    if (!messageText.toLowerCase().includes('room')) {
+                        messageToSend = `I am in room ${roomNumber}. ${messageText}`;
+                    }
+                }
+                
+                // Add to message history
+                messageHistory.push({
+                    role: 'user',
+                    content: messageToSend
+                });
+                
+                // Send to server if connected
+                if (socket && socket.readyState === WebSocket.OPEN) {
+                    socket.send(JSON.stringify({
+                        message: messageToSend,
+                        history: messageHistory
+                    }));
+                } else {
+                    addMessage('Not connected to server. Trying to reconnect...', 'bot');
+                    connectWebSocket();
+                }
+                
+                // Clear input
+                messageInput.value = '';
+            }
+        }
+        
+        // Event listeners
+        sendButton.addEventListener('click', sendMessage);
+        
+        messageInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        
+        // Initial connection
+        connectWebSocket();
+    });
+</script>
+{% endblock %}

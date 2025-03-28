@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Room Service Dashboard - Hotel AI</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        h1, h2, h3 {
+            color: #333;
+        }
+        
+        h1 {
+            text-align: center;
+        }
+        
+        .card {
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .request-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .request-card {
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            background-color: white;
+        }
+        
+        .request-card.new {
+            background-color: #fffacd;
+            border-left: 4px solid #ffd700;
+            animation: fadeIn 1s;
+        }
+        
+        .request-card.food {
+            border-left: 4px solid #4CAF50;
+        }
+        
+        .request-card.drink {
+            border-left: 4px solid #2196F3;
+        }
+        
+        .request-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .request-actions {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 10px;
+        }
+        
+        .request-actions button {
+            margin-left: 10px;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .status-badge.pending {
+            background-color: #FFC107;
+            color: #333;
+        }
+        
+        .status-badge.in-progress {
+            background-color: #2196F3;
+            color: white;
+        }
+        
+        .status-badge.delivered {
+            background-color: #4CAF50;
+            color: white;
+        }
+        
+        .connection-status {
+            margin-bottom: 20px;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        
+        .status-indicator.online {
+            background-color: #4CAF50;
+        }
+        
+        .status-indicator.offline {
+            background-color: #f44336;
+        }
+        
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 15px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        button.start-button {
+            background-color: #2196F3;
+        }
+        
+        button.start-button:hover {
+            background-color: #0b7dda;
+        }
+        
+        button.deliver-button {
+            background-color: #4CAF50;
+        }
+        
+        button.deliver-button:hover {
+            background-color: #45a049;
+        }
+        
+        button.remove-button {
+            background-color: #f44336;
+        }
+        
+        button.remove-button:hover {
+            background-color: #d32f2f;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Room Service Dashboard</h1>
+        
+        <div class="card">
+            <div class="connection-status">
+                <span class="status-indicator offline" id="connection-indicator"></span>
+                <span id="connection-status">Disconnected</span>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>Active Requests</h2>
+            <div class="request-list" id="request-list">
+                <p id="no-requests-message">No active requests at the moment.</p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const connectionIndicator = document.getElementById('connection-indicator');
+            const connectionStatus = document.getElementById('connection-status');
+            const requestList = document.getElementById('request-list');
+            const noRequestsMessage = document.getElementById('no-requests-message');
+            
+            // Get backend URL from template variable or use default
+            const backendUrl = "{{ backend_url }}";
+            
+            let socket = null;
+            let requests = [];
+            
+            // Connect to WebSocket
+            function connectWebSocket() {
+                // Close existing socket if any
+                if (socket) {
+                    socket.close();
+                }
+                
+                // Create new WebSocket connection
+                socket = new WebSocket(`ws://${backendUrl.replace('http://', '')}/ws/room-service`);
+                
+                socket.onopen = function(event) {
+                    console.log('Room Service WebSocket connection established');
+                    connectionIndicator.classList.remove('offline');
+                    connectionIndicator.classList.add('online');
+                    connectionStatus.textContent = 'Connected';
+                };
+                
+                socket.onmessage = function(event) {
+                    console.log('Message from server:', event.data);
+                    try {
+                        const data = JSON.parse(event.data);
+                        
+                        if (data.type === 'notification') {
+                            handleNotification(data);
+                        } else if (data.type === 'connection_status') {
+                            // Handle connection status update
+                            if (data.status === 'connected') {
+                                connectionIndicator.classList.remove('offline');
+                                connectionIndicator.classList.add('online');
+                                connectionStatus.textContent = 'Connected';
+                            } else {
+                                connectionIndicator.classList.remove('online');
+                                connectionIndicator.classList.add('offline');
+                                connectionStatus.textContent = 'Disconnected';
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Error parsing message:', e);
+                    }
+                };
+                
+                socket.onerror = function(error) {
+                    console.error('WebSocket error:', error);
+                    connectionIndicator.classList.remove('online');
+                    connectionIndicator.classList.add('offline');
+                    connectionStatus.textContent = 'Connection Error';
+                };
+                
+                socket.onclose = function(event) {
+                    console.log('WebSocket connection closed');
+                    connectionIndicator.classList.remove('online');
+                    connectionIndicator.classList.add('offline');
+                    connectionStatus.textContent = 'Disconnected';
+                    
+                    // Try to reconnect after 5 seconds
+                    setTimeout(connectWebSocket, 5000);
+                };
+            }
+            
+            // Handle notification
+            function handleNotification(data) {
+                if (data.event === 'room_service_food' || data.event === 'room_service_drink') {
+                    // Hide the "no requests" message if it's visible
+                    if (noRequestsMessage.style.display !== 'none') {
+                        noRequestsMessage.style.display = 'none';
+                    }
+                    
+                    const payload = data.payload;
+                    const roomNumber = payload.roomNumber || 'Unknown';
+                    const requestId = Date.now(); // Generate a unique ID
+                    
+                    // Create request object
+                    const request = {
+                        id: requestId,
+                        type: data.event === 'room_service_food' ? 'food' : 'drink',
+                        roomNumber: roomNumber,
+                        items: data.event === 'room_service_food' ? payload.items : payload.beverages,
+                        instructions: data.event === 'room_service_food' ? payload.instructions : `Ice: ${payload.ice_preference}`,
+                        status: 'pending',
+                        timestamp: new Date().toISOString()
+                    };
+                    
+                    // Add to requests array
+                    requests.push(request);
+                    
+                    // Create and add request card
+                    const requestCard = createRequestCard(request);
+                    requestList.insertBefore(requestCard, requestList.firstChild);
+                    
+                    // Remove 'new' class after animation
+                    setTimeout(() => {
+                        requestCard.classList.remove('new');
+                    }, 2000);
+                }
+            }
+            
+            // Create request card
+            function createRequestCard(request) {
+                const card = document.createElement('div');
+                card.className = `request-card new ${request.type}`;
+                card.id = `request-${request.id}`;
+                
+                const itemsList = request.items.join(', ');
+                const statusText = request.status.charAt(0).toUpperCase() + request.status.slice(1);
+                
+                card.innerHTML = `
+                    <div class="request-header">
+                        <h3>Room ${request.roomNumber} - ${request.type === 'food' ? 'Food Order' : 'Drink Order'}</h3>
+                        <span class="status-badge ${request.status}">${statusText}</span>
+                    </div>
+                    <p><strong>Items:</strong> ${itemsList}</p>
+                    <p><strong>Instructions:</strong> ${request.instructions || 'None'}</p>
+                    <p><strong>Time:</strong> ${new Date(request.timestamp).toLocaleTimeString()}</p>
+                    <div class="request-actions">
+                        ${request.status === 'pending' ? `
+                            <button class="start-button" data-id="${request.id}">Start Preparing</button>
+                            <button class="deliver-button" data-id="${request.id}">Mark Delivered</button>
+                        ` : request.status === 'in-progress' ? `
+                            <button class="deliver-button" data-id="${request.id}">Mark Delivered</button>
+                        ` : `
+                            <button class="remove-button" data-id="${request.id}">Remove</button>
+                        `}
+                    </div>
+                `;
+                
+                // Add event listeners
+                setTimeout(() => {
+                    const startButtons = card.querySelectorAll('.start-button');
+                    const deliverButtons = card.querySelectorAll('.deliver-button');
+                    const removeButtons = card.querySelectorAll('.remove-button');
+                    
+                    startButtons.forEach(button => {
+                        button.addEventListener('click', function() {
+                            updateRequestStatus(this.getAttribute('data-id'), 'in-progress');
+                        });
+                    });
+                    
+                    deliverButtons.forEach(button => {
+                        button.addEventListener('click', function() {
+                            updateRequestStatus(this.getAttribute('data-id'), 'delivered');
+                        });
+                    });
+                    
+                    removeButtons.forEach(button => {
+                        button.addEventListener('click', function() {
+                            removeRequest(this.getAttribute('data-id'));
+                        });
+                    });
+                }, 0);
+                
+                return card;
+            }
+            
+            // Update request status
+            function updateRequestStatus(requestId, newStatus) {
+                // Find the request in the array
+                const requestIndex = requests.findIndex(req => req.id.toString() === requestId);
+                if (requestIndex !== -1) {
+                    // Update the request status
+                    requests[requestIndex].status = newStatus;
+                    
+                    // Update the UI
+                    const requestCard = document.getElementById(`request-${requestId}`);
+                    if (requestCard) {
+                        // Update status badge
+                        const statusBadge = requestCard.querySelector('.status-badge');
+                        statusBadge.className = `status-badge ${newStatus}`;
+                        statusBadge.textContent = newStatus.charAt(0).toUpperCase() + newStatus.slice(1);
+                        
+                        // Update action buttons
+                        const actionsDiv = requestCard.querySelector('.request-actions');
+                        if (newStatus === 'in-progress') {
+                            actionsDiv.innerHTML = `
+                                <button class="deliver-button" data-id="${requestId}">Mark Delivered</button>
+                            `;
+                        } else if (newStatus === 'delivered') {
+                            actionsDiv.innerHTML = `
+                                <button class="remove-button" data-id="${requestId}">Remove</button>
+                            `;
+                        }
+                        
+                        // Add event listeners to new buttons
+                        const deliverButtons = actionsDiv.querySelectorAll('.deliver-button');
+                        const removeButtons = actionsDiv.querySelectorAll('.remove-button');
+                        
+                        deliverButtons.forEach(button => {
+                            button.addEventListener('click', function() {
+                                updateRequestStatus(this.getAttribute('data-id'), 'delivered');
+                            });
+                        });
+                        
+                        removeButtons.forEach(button => {
+                            button.addEventListener('click', function() {
+                                removeRequest(this.getAttribute('data-id'));
+                            });
+                        });
+                    }
+                    
+                    // In a real app, you would send this update to the server
+                    console.log(`Updated request ${requestId} status to ${newStatus}`);
+                }
+            }
+            
+            // Remove request
+            function removeRequest(requestId) {
+                // Find the request in the array
+                const requestIndex = requests.findIndex(req => req.id.toString() === requestId);
+                if (requestIndex !== -1) {
+                    // Remove from array
+                    requests.splice(requestIndex, 1);
+                    
+                    // Remove from UI
+                    const requestCard = document.getElementById(`request-${requestId}`);
+                    if (requestCard) {
+                        requestCard.remove();
+                    }
+                    
+                    // Show "no requests" message if there are no more requests
+                    if (requests.length === 0) {
+                        noRequestsMessage.style.display = 'block';
+                    }
+                    
+                    // In a real app, you would send this update to the server
+                    console.log(`Removed request ${requestId}`);
+                }
+            }
+            
+            // Initial connection
+            connectWebSocket();
+            
+            // Add some sample requests for demonstration
+            setTimeout(() => {
+                handleNotification({
+                    event: 'room_service_food',
+                    payload: {
+                        roomNumber: '101',
+                        items: ['Club Sandwich', 'Fries'],
+                        instructions: 'No onions'
+                    }
+                });
+                
+                setTimeout(() => {
+                    handleNotification({
+                        event: 'room_service_drink',
+                        payload: {
+                            roomNumber: '203',
+                            beverages: ['Coke', 'Water'],
+                            ice_preference: 'light'
+                        }
+                    });
+                }, 2000);
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

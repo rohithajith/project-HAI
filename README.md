@@ -1,231 +1,139 @@
-# Project HAI: An Agentic AI Framework for Hotel Operations Automation
+# Hotel AI System with FastAPI and Flask
 
-## Abstract
+This project implements a hotel AI system with a chatbot interface that connects to AI agents for handling various guest requests. The system uses FastAPI for WebSocket communication and separate Flask applications for each frontend page.
 
-Project HAI represents a paradigm shift in hotel management, leveraging a sophisticated agentic AI framework built upon Large Language Models (LLMs) to automate and streamline administrative and guest service tasks. This system integrates a multi-agent backend with a user-friendly frontend interface, designed to handle diverse hotel operations, from real-time alerts and booking management to intelligent guest interactions and automated task delegation (e.g., laundry notifications, spa bookings, maintenance requests). By employing specialized AI agents coordinated by a supervisor, Project HAI aims to enhance operational efficiency, reduce staff workload, and elevate the guest experience through seamless, intelligent automation.
+## Features
 
-## Vision
+- Guest chatbot interface for making requests
+- Room service dashboard for handling food and drink orders
+- Admin dashboard for maintenance requests and bookings
+- AI agents that process guest requests and send notifications to the appropriate dashboards
+- Real-time updates using WebSockets
 
-The core vision of Project HAI is to revolutionize hotel administration by deploying autonomous AI agents capable of managing complex workflows. When a guest requests a service or an internal need arises, the system intelligently routes the task to the appropriate agent (e.g., Room Service Agent, Maintenance Agent, Concierge Agent). These agents then execute the necessary actions, interact with relevant hotel systems (simulated or real), and communicate updates, effectively automating processes like notifying laundry teams, scheduling spa appointments, logging maintenance issues, and fulfilling guest requests, thereby creating a highly responsive and efficient hotel ecosystem.
+## Architecture
 
-## Key Features & Capabilities
+- **Backend**:
+  - FastAPI server for WebSocket communication and API endpoints
+  - Python-based AI agents for processing guest requests
 
-*   **Agentic Backend Architecture**: Employs a supervisor-agent model where an `AgentManager` routes tasks to specialized agents (e.g., `RoomServiceAgent`, `MaintenanceAgent`) based on request analysis.
-*   **Automated Task Delegation**: Designed to automate tasks such as:
-    *   Sending targeted notifications (e.g., laundry alerts to specific staff/rooms).
-    *   Processing room service orders.
-    *   Logging and prioritizing maintenance requests.
-    *   Handling guest inquiries via an AI assistant.
-*   **Real-time Alert System**: Frontend counter dynamically updates based on backend alert triggers via WebSockets.
-*   **Integrated Booking Management**: Connects to a database (SQLite/PostgreSQL) to display and manage booking information, categorized by status (upcoming, current, past).
-*   **AI Chatbot Assistant**: Provides an interactive interface for guests, powered by:
-    *   Locally hosted, fine-tuned models (e.g., GPT-2 based `finetunedmodel-merged`) for offline capability and data privacy.
-    *   Optional integration with external APIs (e.g., Hugging Face).
-    *   Customizable system prompts for tailored hotel persona and responses.
-*   **Real-time Communication**: Utilizes Socket.IO for seamless bidirectional communication between frontend and backend.
+- **Frontend**:
+  - Three separate Flask applications:
+    - Guest App: For guests to interact with the chatbot
+    - Admin App: For admin notifications (maintenance, bookings)
+    - Room Service App: For room service team notifications (food, drinks)
+  - Each app has its own HTML/CSS/JavaScript interface
+  - WebSocket connections for real-time updates
 
-## System Architecture
+## Setup and Installation
 
-Project HAI utilizes a modern full-stack architecture optimized for real-time interaction and intelligent processing:
+### Using Docker (Recommended)
 
-*   **Frontend**: React.js with Material-UI for a responsive and intuitive user interface.
-*   **Backend**: Node.js with Express.js, featuring a core `AgentManager` and specialized AI agents.
-*   **AI Agents**: JavaScript-based agents (`RoomServiceAgent`, `MaintenanceAgent`, etc.) orchestrated by `AgentManager`.
-*   **LLM Integration**: Python scripts (`local_model_chatbot.py`, `chatbot_bridge.py`) interface with local or remote LLMs for natural language understanding and generation.
-*   **Database**: Supports SQLite (`hotel_bookings.db`) for ease of setup and PostgreSQL for scalability.
-*   **Real-time Layer**: Socket.IO enables instantaneous updates and notifications.
+1. Make sure you have Docker and Docker Compose installed on your system.
 
-### Backend Agentic Workflow
+2. Clone the repository:
+   ```
+   git clone <repository-url>
+   cd project-HAI
+   ```
 
-The backend employs a supervisor pattern where the `AgentManager` acts as the central orchestrator. Upon receiving a user request (typically via the chatbot or specific UI actions), the following flow is initiated:
+3. Build and start the containers:
+   ```
+   docker-compose up --build
+   ```
 
-1.  **Request Reception**: The backend receives the user message and conversation history.
-2.  **Supervisor Analysis**: The `AgentManager` analyzes the message content and context to determine the user's intent.
-3.  **Agent Routing**: Based on the identified intent, the `AgentManager` routes the request to the most appropriate specialized agent (e.g., `RoomServiceAgent` for food orders, `MaintenanceAgent` for repair requests).
-4.  **Agent Execution**: The selected agent processes the request. This may involve:
-    *   Extracting key information (e.g., room number, specific items, issue details).
-    *   Utilizing predefined tools or functions (e.g., `order_food`, `report_issue`).
-    *   Generating internal notifications or alerts (e.g., via `notificationService`).
-    *   Formulating a response for the user.
-5.  **Fallback Mechanism**: If no specialized agent can handle the request, the `AgentManager` defaults to a general-purpose LLM interaction (via `local_model_chatbot.py`) to provide an informative response.
-6.  **Response Delivery**: The final response (generated by an agent or the fallback LLM) is sent back to the user interface.
+4. Access the applications:
+   - Guest Chatbot: http://localhost:5001/
+   - Admin Dashboard: http://localhost:5002/
+   - Room Service Dashboard: http://localhost:5003/
 
-The following diagram illustrates this workflow:
+### Manual Setup
 
-```mermaid
-graph TD
-    A[User Request] --> B{Agent Manager (Supervisor)};
-    B -- Intent Analysis --> C{Route to Agent};
-    C -- Intent: Room Service --> D[Room Service Agent];
-    C -- Intent: Maintenance --> E[Maintenance Agent];
-    C -- Intent: Other/General --> F[General LLM (Fallback)];
-    D -- Uses Tool --> G[Tool Execution (e.g., Order Food)];
-    E -- Uses Tool --> H[Tool Execution (e.g., Report Issue)];
-    G --> I[Agent Response/Action];
-    H --> I;
-    F --> I;
-    I --> J[Response to User];
-```
+1. Clone the repository:
+   ```
+   git clone <repository-url>
+   cd project-HAI
+   ```
 
-## Prerequisites
+2. Install backend dependencies:
+   ```
+   cd backend
+   pip install -r requirements.txt
+   ```
 
-*   Node.js (v14 or higher recommended)
-*   npm (v6 or higher) or yarn
-*   Python (v3.8 or higher, for chatbot features)
-*   Git
+3. Install frontend dependencies:
+   ```
+   pip install flask flask-cors requests
+   ```
 
-## Quick Start Guide
+4. Start the backend server:
+   ```
+   cd backend
+   uvicorn fastapi_server:app --host 0.0.0.0 --port 8000
+   ```
 
-1.  **Clone the repository**:
-    ```bash
-    git clone <repository-url>
-    cd project-HAI
-    ```
+5. Start the frontend applications (in separate terminals):
+   ```
+   # Guest App
+   cd frontend/guest-app
+   flask run --host=0.0.0.0 --port=5001
 
-2.  **One-command setup and run (Installs all dependencies and starts)**:
-    ```bash
-    npm run setup-and-start
-    ```
-    *(Note: Ensure Python environment is set up for chatbot features if needed. See `CHATBOT_SETUP.md`)*
+   # Admin App
+   cd frontend/admin-app
+   flask run --host=0.0.0.0 --port=5002
 
-## Manual Installation
+   # Room Service App
+   cd frontend/room-service-app
+   flask run --host=0.0.0.0 --port=5003
+   ```
 
-1.  **Install Root Dependencies**:
-    ```bash
-    npm install
-    ```
+6. Access the applications:
+   - Guest Chatbot: http://localhost:5001/
+   - Admin Dashboard: http://localhost:5002/
+   - Room Service Dashboard: http://localhost:5003/
 
-2.  **Install Backend & Frontend Dependencies**:
-    ```bash
-    npm run install:all
-    ```
+## Testing the System
 
-3.  **Setup Python Environment (for Chatbot)**:
-    *   Navigate to the `backend` directory.
-    *   Create a virtual environment: `python -m venv venv`
-    *   Activate the environment (e.g., `source venv/bin/activate` on Linux/macOS, `.\venv\Scripts\activate` on Windows).
-    *   Install Python dependencies: `pip install -r ../requirements.txt`
-    *   Refer to `CHATBOT_SETUP.md` and `LOCAL_MODEL_README.md` for detailed model setup.
+1. Open the Guest Chatbot page and enter your room number (e.g., 101).
+2. Send a message like "I'd like to order a burger and fries" - this should trigger the Room Service Agent.
+3. Check the Room Service Dashboard to see the notification for the food order.
+4. Go back to the Guest Chatbot and send a message like "The sink in my bathroom is leaking" - this should trigger the Maintenance Agent.
+5. Check the Admin Dashboard to see the notification for the maintenance request.
 
-4.  **Configure Environment Variables**:
-    *   Review and modify `.env` files in the `backend` directory as needed (defaults provided).
+## Docker Container Structure
 
-5.  **Database Setup**:
-    *   **SQLite (Default)**: The `hotel_bookings.db` file is included. No setup needed initially. It will be created/recreated if missing.
-    *   **PostgreSQL (Optional)**: Refer to `POSTGRESQL_IMPLEMENTATION.md` for setup instructions.
+- **backend**: Contains the FastAPI server and AI agents
+- **guest-app**: Contains the Flask application for the guest chatbot
+- **admin-app**: Contains the Flask application for the admin dashboard
+- **room-service-app**: Contains the Flask application for the room service dashboard
 
-6.  **Start the Application**:
-    ```bash
-    npm start
-    ```
+## WebSocket Endpoints
 
-## Accessing the Application
+- `/ws/guest`: For guest chatbot communication
+- `/ws/admin`: For admin dashboard notifications
+- `/ws/room-service`: For room service dashboard notifications
 
-*   **Frontend**: [http://localhost:3000](http://localhost:3000)
-*   **Backend API**: [http://localhost:5000/api](http://localhost:5000/api)
+## HTTP Endpoints
+
+- `/api/message`: For sending messages via HTTP (alternative to WebSocket)
+- `/health`: For checking the health of the system
+- `/`: Root endpoint
 
 ## Development
 
-### Running Components Separately
+To modify or extend the system:
 
-```bash
-# Start backend only (with auto-restart on changes)
-npm run dev:backend
-
-# Start frontend only (React development server)
-npm run start:frontend
-```
-*(Note: `dev:backend` uses `nodemon`, ensure it's installed: `npm install -g nodemon` or run via `npx nodemon server.js`)*
-
-### Project Structure Overview
-
-```
-project-HAI/
-├── frontend/                  # React frontend application
-│   └── src/
-│       ├── components/        # UI components (Alerts, Bookings, Chatbot, Auth, etc.)
-│       ├── contexts/          # React Context API for state management
-│       ├── pages/             # Top-level page components
-│       └── services/          # API and WebSocket service integrations
-│
-├── backend/                   # Node.js backend application
-│   ├── ai_agents/             # Core AI agent logic (Manager, Specific Agents)
-│   ├── config/                # Configuration (database connections)
-│   ├── controllers/           # Express route handlers
-│   ├── middleware/            # Express middleware (e.g., authentication)
-│   ├── models/                # Database models/schemas (if using an ORM)
-│   ├── routes/                # API route definitions
-│   ├── services/              # Business logic (notifications, sockets, DB interactions)
-│   ├── scripts/               # Utility and setup scripts
-│   ├── chatbot_bridge.py      # Python bridge for LLM communication
-│   ├── local_model_chatbot.py # Logic for local LLM interaction
-│   └── server.js              # Main server entry point
-│
-├── hotel_bookings.db          # Default SQLite database file
-├── requirements.txt           # Python dependencies
-├── README.md                  # This file
-└── package.json               # Root project configuration and scripts
-```
-
-## API Endpoints & WebSocket Events
-
-*(Existing API and WebSocket details remain largely the same but could be updated based on agent interactions if necessary. Keeping the original list for now.)*
-
-### Bookings API
-*   `GET /api/bookings` - Get all bookings
-*   `GET /api/bookings/upcoming` - Get upcoming bookings
-*   `GET /api/bookings/current` - Get current bookings
-*   `GET /api/bookings/past` - Get past bookings
-*   `GET /api/bookings/:id` - Get booking by ID
-
-### Alerts API
-*   `GET /api/alerts` - Get alert history
-*   `GET /api/alerts/count` - Get current alert count
-*   `POST /api/alerts` - Create a new alert
-*   `PUT /api/alerts/:id/resolve` - Resolve an alert
-*   `POST /api/alerts/reset` - Reset alert counter
-
-### Notifications API
-*   `GET /api/notifications` - Get all notifications
-*   `POST /api/notifications` - Create a new notification
-*   `GET /api/notifications/room/:roomNumber` - Get notifications for a specific room
-*   `PUT /api/notifications/:id/read` - Mark a notification as read
-*   `POST /api/notifications/laundry` - Send a laundry alert notification
-
-### WebSocket Events (Server -> Client)
-*   `alert_count_updated` - Broadcast updated alert count
-*   `new_booking` - Broadcast when a new booking is added
-*   `booking_updated` - Broadcast when a booking is updated
-*   `new_notification` - Send targeted notification
-
-### WebSocket Events (Client -> Server)
-*   `trigger_alert` - Client triggers an alert
-*   `send_notification` - Send a notification to specific room(s)
-*   `join_room` - Join a specific notification room
-*   `chat_message` (Implicitly handled by chatbot/agent system)
+1. AI Agents: Edit files in the `backend/ai_agents` directory
+2. Frontend: Edit templates in the respective app's `templates` directory
+3. Backend: Edit `fastapi_server.py` as needed
 
 ## Troubleshooting
 
-*(Keep existing troubleshooting section)*
-
-1.  **Port conflicts**: If ports 3000 or 5000 are already in use, you can modify the port in:
-   - Backend: Edit `PORT` in `backend/.env`
-   - Frontend: Create a `.env` file in the frontend directory with `PORT=3001`
-
-2.  **Database errors**: If you encounter database errors, try deleting the `hotel_bookings.db` file and restart the application (for SQLite). Check PostgreSQL connection details if using Postgres.
-
-3.  **Missing dependencies**: If you encounter errors about missing modules, run:
-   ```bash
-   npm run install:all
-   ```
-   And ensure Python dependencies are installed:
-   ```bash
-   # In backend directory with activated venv
-   pip install -r ../requirements.txt
-   ```
-
-4.  **Chatbot Model Issues**: Refer to `CHATBOT_SETUP.md` and `LOCAL_MODEL_README.md`. Ensure Python environment and dependencies are correct. Check model download/path.
-
-## License
-
-This project is licensed under the ISC License.
+- If the WebSocket connection fails, check that the backend server is running
+- If agents aren't responding, check the console logs for errors
+- Make sure all dependencies are installed correctly
+- If using Docker, check the container logs for any errors:
+  ```
+  docker-compose logs backend
+  docker-compose logs guest-app
+  docker-compose logs admin-app
+  docker-compose logs room-service-app

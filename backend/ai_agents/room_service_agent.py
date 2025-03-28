@@ -65,10 +65,23 @@ class RoomServiceAgent(BaseAgent):
     def should_handle(self, message: str, history: List[Dict[str, Any]]) -> bool:
         """Check if the message relates to room service (food/drinks)."""
         lower_message = message.lower()
+        
+        # Expanded keyword list for better detection
         keywords = [
             'room service', 'food', 'drink', 'beverage', 'menu', 'order',
-            'eat', 'hungry', 'thirsty', 'snack', 'meal'
+            'eat', 'hungry', 'thirsty', 'snack', 'meal', 'burger', 'fries',
+            'pizza', 'sandwich', 'breakfast', 'lunch', 'dinner', 'coke', 'water',
+            'juice', 'soda', 'coffee', 'tea', 'ice', 'get me', 'bring me'
         ]
+        
+        # Check for room number in message or history to improve context awareness
+        has_room_context = 'room' in lower_message or self._extract_room_number(history) is not None
+        
+        # More aggressive matching - if we have room context and food/drink terms
+        if has_room_context:
+            return any(keyword in lower_message for keyword in keywords)
+        
+        # Otherwise use stricter matching
         return any(keyword in lower_message for keyword in keywords)
 
     async def process(self, message: str, history: List[Dict[str, Any]]) -> AgentOutput:
@@ -81,31 +94,85 @@ class RoomServiceAgent(BaseAgent):
         tool_args: Dict[str, Any] = {}
 
         # More comprehensive keyword sets
-        food_keywords = ['food', 'eat', 'hungry', 'snack', 'meal', 'menu', 'order', 'sandwich', 'burger', 'fries', 'pizza', 'breakfast', 'lunch', 'dinner']
-        drink_keywords = ['drink', 'beverage', 'thirsty', 'coke', 'water', 'juice', 'soda', 'coffee', 'tea']
+        food_keywords = ['food', 'eat', 'hungry', 'snack', 'meal', 'menu', 'order', 'sandwich', 'burger', 'fries',
+                         'pizza', 'breakfast', 'lunch', 'dinner', 'club', 'salad', 'pasta', 'steak', 'chicken']
+        
+        drink_keywords = ['drink', 'beverage', 'thirsty', 'coke', 'water', 'juice', 'soda', 'coffee', 'tea',
+                          'beer', 'wine', 'cocktail', 'sprite', 'pepsi', 'lemonade']
+
+        # Common food items to detect
+        food_items = ['burger', 'fries', 'pizza', 'sandwich', 'salad', 'pasta', 'steak', 'chicken', 'fish',
+                      'breakfast', 'lunch', 'dinner', 'snack', 'meal', 'club']
+        
+        # Common drink items to detect
+        drink_items = ['coke', 'water', 'juice', 'soda', 'coffee', 'tea', 'beer', 'wine', 'cocktail',
+                       'sprite', 'pepsi', 'lemonade']
 
         # Check for keywords, giving priority to food if both types are mentioned
         is_food_request = any(k in lower_message for k in food_keywords)
         is_drink_request = any(k in lower_message for k in drink_keywords)
 
+        # Extract food items from message
+        extracted_food_items = []
+        for item in food_items:
+            if item in lower_message:
+                extracted_food_items.append(item)
+        
+        # Extract drink items from message
+        extracted_drink_items = []
+        for item in drink_items:
+            if item in lower_message:
+                extracted_drink_items.append(item)
+
+        # If we found specific food items, it's definitely a food request
+        if extracted_food_items:
+            is_food_request = True
+            
+        # If we found specific drink items, it's definitely a drink request
+        if extracted_drink_items:
+            is_drink_request = True
+
         if is_food_request:
             selected_tool_name = 'order_food'
-            # Simplified arg extraction - LLM/parsing needed for real items
-            # Extract potential items crudely for now
-            potential_items = [word for word in message.split() if word.lower() in food_keywords or len(word) > 3] # Basic filter
-            tool_args = {'items': potential_items or [message], 'special_instructions': ''} # Use message as fallback
-            # logger.info(f"Selected tool 'order_food' with args: {tool_args}") # Add logging if needed
+            # Use extracted items if available, otherwise fallback to basic extraction
+            if extracted_food_items:
+                items = extracted_food_items
+            else:
+                # Simplified arg extraction as fallback
+                items = [word for word in message.split() if word.lower() in food_keywords or len(word) > 3]
+                
+            # Extract special instructions
+            special_instructions = ""
+            if "no " in lower_message or "without " in lower_message:
+                # Simple extraction of special instructions
+                for phrase in ["no ", "without "]:
+                    if phrase in lower_message:
+                        idx = lower_message.find(phrase)
+                        end_idx = lower_message.find(" ", idx + len(phrase) + 5)  # Look for space after the word
+                        if end_idx == -1:
+                            end_idx = len(lower_message)
+                        special_instructions += lower_message[idx:end_idx] + " "
+            
+            tool_args = {'items': items or ["food order"], 'special_instructions': special_instructions.strip()}
+            print(f"Selected tool 'order_food' with args: {tool_args}")  # Debug log
 
         elif is_drink_request:
             selected_tool_name = 'order_drinks'
-            # Simplified arg extraction
-            potential_drinks = [word for word in message.split() if word.lower() in drink_keywords or len(word) > 3]
+            # Use extracted items if available, otherwise fallback to basic extraction
+            if extracted_drink_items:
+                beverages = extracted_drink_items
+            else:
+                # Simplified arg extraction as fallback
+                beverages = [word for word in message.split() if word.lower() in drink_keywords or len(word) > 3]
+                
+            # Determine ice preference
             ice_pref = 'regular'
             if 'no ice' in lower_message: ice_pref = 'none'
             elif 'light ice' in lower_message: ice_pref = 'light'
             elif 'extra ice' in lower_message: ice_pref = 'extra'
-            tool_args = {'beverages': potential_drinks or [message], 'ice_preference': ice_pref}
-            # logger.info(f"Selected tool 'order_drinks' with args: {tool_args}") # Add logging if needed
+            
+            tool_args = {'beverages': beverages or ["drink order"], 'ice_preference': ice_pref}
+            print(f"Selected tool 'order_drinks' with args: {tool_args}")  # Debug log
 
         # Execute the selected tool if one was identified
         if selected_tool_name == 'order_food':

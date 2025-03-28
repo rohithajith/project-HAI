@@ -1,0 +1,71 @@
+version: '3'
+
+services:
+  # Backend service
+  backend:
+    build: ./backend
+    container_name: hotel-ai-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - hotel-ai-network
+    restart: unless-stopped
+
+  # Guest App service
+  guest-app:
+    build: ./frontend/guest-app
+    container_name: hotel-ai-guest-app
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./frontend/guest-app:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+      - BACKEND_URL=http://backend:8000
+    depends_on:
+      - backend
+    networks:
+      - hotel-ai-network
+    restart: unless-stopped
+
+  # Admin App service
+  admin-app:
+    build: ./frontend/admin-app
+    container_name: hotel-ai-admin-app
+    ports:
+      - "5002:5002"
+    volumes:
+      - ./frontend/admin-app:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+      - BACKEND_URL=http://backend:8000
+    depends_on:
+      - backend
+    networks:
+      - hotel-ai-network
+    restart: unless-stopped
+
+  # Room Service App service
+  room-service-app:
+    build: ./frontend/room-service-app
+    container_name: hotel-ai-room-service-app
+    ports:
+      - "5003:5003"
+    volumes:
+      - ./frontend/room-service-app:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+      - BACKEND_URL=http://backend:8000
+    depends_on:
+      - backend
+    networks:
+      - hotel-ai-network
+    restart: unless-stopped
+
+networks:
+  hotel-ai-network:
+    driver: bridge
