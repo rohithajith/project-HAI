@@ -78,7 +78,6 @@ class GuestNamespace(Namespace):
                 }]
                 
                 # Emit notification to room service dashboard
-                # For testing, make sure to explicitly include all expected fields
                 notification_data = {
                     'event': 'room_service_request',
                     'payload': {
@@ -101,96 +100,23 @@ class GuestNamespace(Namespace):
                 logger.info(f"Direct response sent for {notification_type}")
                 return
             
-            # Process with agent manager if available
-            elif agent_manager:
-                try:
-                    # Process the message through the agent system
-                    result = agent_manager.process(message, history)
-                    
-                    # Send response back to guest
-                    emit('message', {
-                        'response': result.response,
-                        'notifications': result.notifications,
-                        'agent': 'room_service_agent'  # Add agent info for test verification
-                    })
-                    
-                    # Check for room service related notifications
-                    for notification in result.notifications:
-                        if notification.get('type') in ['housekeeping_request', 'order_started', 'menu_viewed', 'general_inquiry']:
-                            # Broadcast to room service dashboard
-                            notification_data = {
-                                'event': 'room_service_request',
-                                'payload': {
-                                    'roomNumber': room,
-                                    'request': message,
-                                    'timestamp': time.time(),
-                                    'agent': 'room_service_agent'  # Add agent info for test verification
-                                }
-                            }
-                            logger.info(f"Sending agent room service notification: {notification_data}")
-                            socketio.emit('notification', notification_data, namespace='/room-service')
-                            
-                            # Also notify admin dashboard
-                            socketio.emit('notification', {
-                                'event': 'room_service_request',
-                                'payload': {
-                                    'roomNumber': room,
-                                    'request': message,
-                                    'timestamp': time.time()
-                                }
-                            }, namespace='/admin')
-                    
-                    return
-                except Exception as e:
-                    logger.error(f"Error processing with agent: {e}", exc_info=True)
-            
-            # Fallback if agent manager fails or is not available
-            if any(keyword in message.lower() for keyword in ['food', 'drink', 'towel', 'room service', 'order', 'burger', 'fries']):
-                # Create notifications for the response
-                notifications = [{
-                    'type': 'housekeeping_request' if 'towel' in message.lower() else 'order_started',
-                    'room_number': room,
-                    'timestamp': time.time(),
-                    'agent': 'room_service_agent'
-                }]
-                
-                # Broadcast to room service dashboard
-                # For testing, make sure to explicitly include all expected fields
-                notification_data = {
-                    'event': 'room_service_request',
-                    'payload': {
-                        'roomNumber': room,
-                        'request': message,
-                        'timestamp': time.time(),
-                        'agent': 'room_service_agent'
-                    }
-                }
-                logger.info(f"Sending fallback room service notification: {notification_data}")
-                socketio.emit('notification', notification_data, namespace='/room-service')
-                
-                # Also notify admin dashboard
-                socketio.emit('notification', {
-                    'event': 'room_service_request',
-                    'payload': {
-                        'roomNumber': room,
-                        'request': message,
-                        'timestamp': time.time(),
-                        'agent': 'room_service_agent'
-                    }
-                }, namespace='/admin')
-                
-                # Send response to guest with agent info
-                response_data = {
-                    'response': f"Thank you for your request. Our room service team will process your order for room {room} shortly.",
-                    'notifications': notifications,
-                    'agent': 'room_service_agent'
-                }
-                logger.info(f"Sending guest response: {response_data}")
-                emit('message', response_data)
+            # For all other requests, send to admin dashboard
             else:
-                # Generic response for other messages
+                # Create a general request notification
+                notification_data = {
+                    'event': 'general_request',
+                    'payload': {
+                        'roomNumber': room,
+                        'request': message,
+                        'timestamp': time.time()
+                    }
+                }
+                logger.info(f"Sending general request to admin dashboard: {notification_data}")
+                socketio.emit('notification', notification_data, namespace='/admin')
+                
+                # Send response back to guest
                 emit('message', {
-                    'response': f"I understand you're in room {room}. How else can I assist you today?",
+                    'response': f"I've forwarded your request to our admin team. They will assist you shortly from room {room}.",
                     'agent': 'general_assistant'
                 })
             
