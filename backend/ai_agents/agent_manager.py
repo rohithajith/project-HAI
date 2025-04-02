@@ -1,288 +1,299 @@
-import logging # Import logging
-import sys # Import sys for potential stderr printing
-from typing import List, Dict, Any, Optional, TypedDict
-from langgraph.graph import StateGraph, END
+from typing import Dict, List, Any, Optional
+from datetime import datetime
+from pathlib import Path
+import json
+import asyncio
 
-# Import the agents
-from .base_agent import AgentOutput
-from .maintenance_agent import MaintenanceAgent
+from .supervisor_agent import SupervisorAgent
+from .checkin_agent import CheckInAgent
 from .room_service_agent import RoomServiceAgent
+from .wellness_agent import WellnessAgent
+from .services_booking_agent import ServicesBookingAgent
+from .promotion_agent import PromotionAgent
+from .base_agent import AgentOutput
+from .error_handler import (
+    error_handler, 
+    with_error_handling, 
+    AgentError, 
+    ProcessingError,
+    ValidationError,
+    ErrorMetadata
+)
 
-# Get a logger for this module
-logger = logging.getLogger(__name__)
-
-from functools import lru_cache
-from datetime import datetime, timedelta
-
-# Define the state for the graph
-class AgentState(TypedDict):
-    message: str
-    history: List[Dict[str, Any]]
-    agents: List[Any] # List of agent instances, sorted by priority
-    current_agent_index: int
-    final_output: Optional[AgentOutput] # Store the result from the handling agent
-    agent_handled: bool # Track if any agent successfully handled the request
-
-# --- Start of Corrected Class Definition ---
-class AgentManagerCorrected:
-    """
-    Manages a collection of agents and processes messages through them using LangGraph.
-    Uses refined node logic for clarity and implements caching for better performance.
-    """
-    def __init__(self, cache_ttl: int = 3600):  # Cache TTL in seconds, default 1 hour
-        self.agents = sorted(
-            [RoomServiceAgent(), MaintenanceAgent()],
-            key=lambda agent: agent.priority,
-            reverse=True
-        )
-        self.graph = self._build_graph()
-        self.cache_ttl = cache_ttl
-        self._cache = {}
-        self._cache_timestamps = {}
-
-    def _build_graph(self):
-        builder = StateGraph(AgentState)
-        builder.add_node("select_agent", self._select_agent_node)
-        builder.add_node("run_agent", self._run_agent_node)
-        builder.add_conditional_edges(
-            "run_agent",
-            self._decide_next_step_edge,
-            {
-                "continue": "select_agent",
-                "end": END
-            }
-        )
-        builder.set_entry_point("select_agent")
-        return builder.compile()
-
-    # Node Functions (bound to instance implicitly or explicitly if needed)
-    def _select_agent_node(self, state: AgentState) -> AgentState:
-        agent_index = state['current_agent_index']
-        if agent_index >= len(state['agents']):
-            # Use logger instead of print
-            logger.info(f"Select: No more agents (index {agent_index}), ensuring fall-through")
-            if state.get('final_output') is None: # Check if None specifically
-                 state['final_output'] = AgentOutput(response="", tool_used=False, notifications=[]) # Ensure notifications list exists
-        else:
-            # Use logger instead of print
-            logger.info(f"Select: Agent at index {agent_index} ({state['agents'][agent_index].name})")
-        return state
-
-    def _get_cache_key(self, message: str, history: List[Dict[str, Any]], agent_name: str) -> str:
-        """Generate a cache key from message, last history item, and agent name."""
-        last_history = history[-1]['content'] if history else ''
-        return f"{agent_name}:{message}:{last_history}"
-
-    def _get_from_cache(self, cache_key: str) -> Optional[AgentOutput]:
-        """Get a cached response if it exists and hasn't expired."""
-        if cache_key in self._cache:
-            timestamp = self._cache_timestamps.get(cache_key)
-            if timestamp and datetime.now() - timestamp < timedelta(seconds=self.cache_ttl):
-                logger.debug(f"Cache hit for key: {cache_key}")
-                return self._cache[cache_key]
-            else:
-                # Clean up expired cache entry
-                del self._cache[cache_key]
-                del self._cache_timestamps[cache_key]
-        return None
-
-    def _add_to_cache(self, cache_key: str, output: AgentOutput):
-        """Add a response to the cache."""
-        self._cache[cache_key] = output
-        self._cache_timestamps[cache_key] = datetime.now()
-        logger.debug(f"Added to cache: {cache_key}")
-
-    async def _run_agent_node(self, state: AgentState) -> AgentState:
-        agent_index = state['current_agent_index']
-        if agent_index >= len(state['agents']):
-            logger.info(f"Run: Invalid index {agent_index}, skipping run")
-            if state.get('final_output') is None:
-                state['final_output'] = AgentOutput(
-                    response="No agent available to handle the request.",
-                    tool_used=False,
-                    notifications=[]
-                )
-            return state
-
-        agent = state['agents'][agent_index]
-        message = state['message']
-        history = state['history']
+class AgentManager:
+    """Manages the multi-agent system and coordinates agent interactions."""
+    
+    def __init__(self):
+        # Initialize supervisor
+        self.supervisor = SupervisorAgent()
         
-        logger.info(f"Run: Processing with agent {agent.name}")
+        # Initialize conversation storage
+        self.conversation_storage_path = Path("data/conversations")
+        self.conversation_storage_path.mkdir(parents=True, exist_ok=True)
         
+        # Initialize and register specialized agents
+        self._register_agents()
+        
+        # Build the workflow
+        self.supervisor.build_workflow()
+    
+    @with_error_handling({"component": "agent_registration"})
+    async def _register_agents(self):
+        """Register all specialized agents with the supervisor."""
         try:
-            # Check cache first
-            cache_key = self._get_cache_key(message, history, agent.name)
-            cached_output = self._get_from_cache(cache_key)
+            # Register check-in agent
+            checkin_agent = CheckInAgent()
+            self.supervisor.register_agent(checkin_agent)
             
-            if cached_output:
-                logger.info(f"Run: Using cached response for agent {agent.name}")
-                state['final_output'] = cached_output
-                state['agent_handled'] = True
-                return state
-
-            # Process with agent if not cached
-            if agent.should_handle(message, history):
-                logger.info(f"Run: Agent {agent.name} SHOULD handle")
-                try:
-                    output: AgentOutput = await agent.process(message, history)
-                    logger.info(f"Run: Agent {agent.name} output: {output!r}")
-                    
-                    if output and (getattr(output, 'response', None) or getattr(output, 'tool_used', False)):
-                        # Cache successful response
-                        self._add_to_cache(cache_key, output)
-                        state['final_output'] = output
-                        state['agent_handled'] = True
-                    else:
-                        logger.warning(
-                            f"Run: Agent {agent.name} handled but produced no actionable output.",
-                            extra={'agent': agent.name, 'message': message}
-                        )
-                        state['final_output'] = None
-                        state['agent_handled'] = False
-                except Exception as e:
-                    logger.error(
-                        f"Run: Error during agent {agent.name} process method: {e}",
-                        exc_info=True,
-                        extra={'agent': agent.name, 'message': message}
-                    )
-                    state['final_output'] = None
-                    state['agent_handled'] = False
-            else:
-                logger.info(f"Run: Agent {agent.name} should NOT handle")
-                state['final_output'] = None
-                state['agent_handled'] = False
+            # Register room service agent
+            room_service_agent = RoomServiceAgent()
+            self.supervisor.register_agent(room_service_agent)
+            
+            # Register wellness agent
+            wellness_agent = WellnessAgent()
+            self.supervisor.register_agent(wellness_agent)
+            
+            # Register services booking agent
+            services_booking_agent = ServicesBookingAgent()
+            self.supervisor.register_agent(services_booking_agent)
+            
+            # Register promotion agent
+            promotion_agent = PromotionAgent()
+            self.supervisor.register_agent(promotion_agent)
+            
         except Exception as e:
-            logger.error(
-                f"Run: Unexpected error in agent node execution: {e}",
-                exc_info=True,
-                extra={'agent': agent.name, 'message': message}
+            raise ProcessingError(
+                f"Failed to register agents: {str(e)}",
+                metadata=ErrorMetadata(
+                    severity="critical",
+                    category="initialization",
+                    context={"component": "agent_registration"}
+                )
             )
-            state['final_output'] = None
-            state['agent_handled'] = False
+    
+    @with_error_handling({"component": "message_processing"})
+    async def process_message(self, 
+                            message: str, 
+                            conversation_id: str,
+                            history: Optional[List[Dict[str, Any]]] = None) -> AgentOutput:
+        """
+        Process an incoming message through the multi-agent system.
+        
+        Args:
+            message: The user's message
+            conversation_id: Unique identifier for the conversation
+            history: Optional conversation history
             
-        return state
-
-    # Edge Logic
-    def _decide_next_step_edge(self, state: AgentState) -> str:
-        agent_output = state.get('final_output')
-        current_index = state['current_agent_index']
-        agent_handled = state.get('agent_handled', False)
-        current_agent = state['agents'][current_index].name
-
-        # If the current agent handled the request successfully
-        if agent_handled:
-            logger.info(
-                f"Decide: Agent {current_agent} handled successfully. END",
-                extra={'agent': current_agent, 'status': 'handled'}
+        Returns:
+            AgentOutput containing the response and any notifications
+        """
+        if not message.strip():
+            raise ValidationError(
+                "Message cannot be empty",
+                metadata=ErrorMetadata(
+                    severity="warning",
+                    category="validation",
+                    context={
+                        "conversation_id": conversation_id,
+                        "component": "message_processing"
+                    }
+                )
             )
-            return "end"
-        
-        # If we haven't found a handler yet, try the next agent
-        next_index = current_index + 1
-        if next_index < len(state['agents']):
-            next_agent = state['agents'][next_index].name
-            logger.info(
-                f"Decide: Agent {current_agent} did not handle. Trying next agent {next_agent}",
-                extra={
-                    'current_agent': current_agent,
-                    'next_agent': next_agent,
-                    'status': 'continue'
-                }
-            )
-            state['current_agent_index'] = next_index
-            state['final_output'] = None  # Clear output before next agent
-            state['agent_handled'] = False  # Reset handled flag
-            return "continue"
-        
-        # If we've tried all agents and none handled it
-        logger.warning(
-            f"Decide: No agents could handle the request. Last attempted: {current_agent}",
-            extra={
-                'tried_agents': [agent.name for agent in state['agents']],
-                'status': 'fallthrough'
-            }
-        )
-        
-        # Set a friendly fallback response
-        if state.get('final_output') is None:
-            state['final_output'] = AgentOutput(
-                response="I apologize, but I don't have the capability to handle this request. Could you please try rephrasing or ask something else?",
-                tool_used=False,
-                notifications=["No agent could process this request"]
-            )
-        return "end"
-
-    # Public methods
-    async def process(self, message: str, history: List[Dict[str, Any]]) -> AgentOutput:
-        """Process a message through the agent graph asynchronously."""
-        initial_state: AgentState = {
-            "message": message,
-            "history": history,
-            "agents": self.agents,
-            "current_agent_index": 0,
-            "final_output": None,
-            "agent_handled": False  # Track if any agent successfully handled the request
+            
+        if history is None:
+            history = await self.get_conversation_history(conversation_id)
+            
+        error_context = {
+            "conversation_id": conversation_id,
+            "component": "message_processing",
+            "history_length": len(history) if history else 0
         }
+            
         try:
-            final_state = await self.graph.ainvoke(initial_state)
+            # Process message through supervisor's workflow
+            response = await error_handler.handle_with_retry(
+                self.supervisor.process_message,
+                message=message,
+                history=history,
+                error_context=error_context
+            )
             
-            # Get the final output or create a default response
-            final_output = final_state.get('final_output')
-            if final_output is None or (not final_output.response and not final_output.tool_used):
-                final_output = AgentOutput(
-                    response="Sorry, I couldn't understand your request. Could you please rephrase?",
-                    tool_used=False,
-                    notifications=[]
-                )
+            # Log conversation for GDPR compliance
+            await self._log_conversation(conversation_id, message, response)
             
-            return final_output
+            return response
             
+        except AgentError:
+            # Re-raise agent errors to be handled by decorator
+            raise
         except Exception as e:
-            logger.error(f"Error invoking agent graph: {e}", exc_info=True)
-            # Return a friendly error response instead of None
-            return AgentOutput(
-                response="I apologize, but I encountered an error processing your request. Please try again.",
-                tool_used=False,
-                notifications=["Error: Internal processing failed"]
+            raise ProcessingError(
+                f"Failed to process message: {str(e)}",
+                metadata=ErrorMetadata(
+                    severity="error",
+                    category="processing",
+                    context=error_context
+                )
+            )
+    
+    @with_error_handling({"component": "conversation_logging"})
+    async def _log_conversation(self, 
+                              conversation_id: str, 
+                              message: str, 
+                              response: AgentOutput):
+        """
+        Log conversation for GDPR compliance and monitoring.
+        
+        Args:
+            conversation_id: Unique identifier for the conversation
+            message: The user's message
+            response: The system's response
+        """
+        try:
+            log_file = self.conversation_storage_path / f"{conversation_id}.jsonl"
+            
+            log_entry = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "message": message,
+                "response": response.model_dump(),
+                "metadata": {
+                    "conversation_id": conversation_id
+                }
+            }
+            
+            # Append to log file
+            async with aiofiles.open(log_file, 'a') as f:
+                await f.write(json.dumps(log_entry) + '\n')
+                
+        except Exception as e:
+            raise ProcessingError(
+                f"Failed to log conversation: {str(e)}",
+                metadata=ErrorMetadata(
+                    severity="warning",
+                    category="logging",
+                    context={
+                        "conversation_id": conversation_id,
+                        "component": "conversation_logging"
+                    }
+                )
             )
 
-    def get_all_tools(self) -> List[Dict[str, Any]]:
-        all_tools = []
-        for agent in self.agents:
-            all_tools.extend(agent.get_available_tools())
-        return all_tools
+    @with_error_handling({"component": "conversation_history"})
+    async def get_conversation_history(self, 
+                                     conversation_id: str,
+                                     max_messages: int = 100) -> List[Dict[str, Any]]:
+        """
+        Retrieve conversation history for a given conversation ID.
+        Implements GDPR compliance for data access.
+        
+        Args:
+            conversation_id: Unique identifier for the conversation
+            max_messages: Maximum number of messages to retrieve
+            
+        Returns:
+            List of conversation messages
+        """
+        try:
+            log_file = self.conversation_storage_path / f"{conversation_id}.jsonl"
+            
+            if not log_file.exists():
+                return []
+                
+            history = []
+            async with aiofiles.open(log_file, 'r') as f:
+                async for line in f:
+                    entry = json.loads(line)
+                    history.append({
+                        "role": "user",
+                        "content": entry["message"],
+                        "timestamp": entry["timestamp"]
+                    })
+                    history.append({
+                        "role": "assistant",
+                        "content": entry["response"]["response"],
+                        "timestamp": entry["timestamp"]
+                    })
+                    
+                    if len(history) >= max_messages:
+                        break
+                        
+            return history
+            
+        except Exception as e:
+            raise ProcessingError(
+                f"Failed to retrieve conversation history: {str(e)}",
+                metadata=ErrorMetadata(
+                    severity="error",
+                    category="data_access",
+                    context={
+                        "conversation_id": conversation_id,
+                        "component": "conversation_history"
+                    }
+                )
+            )
 
-# --- End of Corrected Class Definition ---
+    @with_error_handling({"component": "conversation_deletion"})
+    async def delete_conversation(self, conversation_id: str):
+        """
+        Delete conversation history for GDPR compliance.
+        
+        Args:
+            conversation_id: Unique identifier for the conversation to delete
+        """
+        try:
+            log_file = self.conversation_storage_path / f"{conversation_id}.jsonl"
+            
+            if log_file.exists():
+                log_file.unlink()
+                
+            # Log deletion for compliance
+            deletion_log = self.conversation_storage_path / "deletions.log"
+            async with aiofiles.open(deletion_log, 'a') as f:
+                await f.write(
+                    json.dumps({
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "conversation_id": conversation_id,
+                        "action": "deletion"
+                    }) + '\n'
+                )
+                
+        except Exception as e:
+            raise ProcessingError(
+                f"Failed to delete conversation: {str(e)}",
+                metadata=ErrorMetadata(
+                    severity="error",
+                    category="data_deletion",
+                    context={
+                        "conversation_id": conversation_id,
+                        "component": "conversation_deletion"
+                    }
+                )
+            )
 
-# Example Usage (using the corrected class) - Keep prints here for direct script run test
-if __name__ == '__main__':
-    import asyncio
+    @with_error_handling({"component": "health_check"})
+    async def check_health(self) -> Dict[str, Any]:
+        """
+        Check the health status of the agent system.
+        
+        Returns:
+            Dictionary containing health status information
+        """
+        try:
+            return {
+                "status": "healthy",
+                "active_agents": list(self.supervisor.agents.keys()),
+                "conversation_storage": str(self.conversation_storage_path),
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        except Exception as e:
+            raise ProcessingError(
+                f"Health check failed: {str(e)}",
+                metadata=ErrorMetadata(
+                    severity="warning",
+                    category="health_check",
+                    context={"component": "health_check"}
+                )
+            )
 
-    # Configure root logger for testing if run directly
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-    async def main():
-        # Use the corrected manager
-        manager = AgentManagerCorrected()
-        print("Agent Manager Initialized (Direct Run).") # Use print for direct run feedback
-        print("Agents (priority order):", [agent.name for agent in manager.agents])
-
-        history = [{'role': 'user', 'content': 'I am in room 303.'}]
-        messages = [
-            "The TV remote is broken.", # Maintenance
-            "I'd like to order a pizza and a coke.", # Room Service (Food)
-            "What's the weather like?", # Fall through
-            "Can you schedule maintenance for my AC unit for tomorrow morning?", # Maintenance
-            "I'm thirsty, get me some water." # Room Service (Drink)
-        ]
-
-        for msg in messages:
-            print(f"\n--- Processing Message (Direct Run): '{msg}' ---") # Use print
-            result = await manager.process(msg, history)
-            print(f"--- Final Result (Direct Run) for '{msg}': {result} ---") # Use print
-            history.append({'role': 'user', 'content': msg})
-            if result and result.response:
-                history.append({'role': 'assistant', 'content': result.response})
-
-    asyncio.run(main())
+# Create singleton instance
+agent_manager = AgentManager()

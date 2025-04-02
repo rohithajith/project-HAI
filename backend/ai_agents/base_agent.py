@@ -1,6 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional, Type
 from pydantic import BaseModel, Field
+from datetime import datetime
+import re
+from .content_filter import content_filter, FilterResult
 
 class ToolParameterProperty(BaseModel):
     """Defines a single parameter property for a tool."""
@@ -28,13 +31,19 @@ class AgentOutput(BaseModel):
     tool_used: bool = False
     tool_name: Optional[str] = None
     tool_args: Optional[Dict[str, Any]] = None
+    filter_result: Optional[FilterResult] = None
 
 class BaseAgent(ABC):
     """Abstract base class for all AI agents."""
     name: str = "BaseAgent"
-    priority: int = 0 # Higher number means higher priority
+    priority: int = 0  # Higher number means higher priority
     tools: List[ToolDefinition] = []
-
+    
+    def __init__(self):
+        """Initialize the agent with default settings."""
+        self.max_severity_threshold = 3  # Default maximum allowed severity
+        self.language = "en"  # Default language
+        
     @abstractmethod
     def should_handle(self, message: str, history: List[Dict[str, Any]]) -> bool:
         """
@@ -51,7 +60,7 @@ class BaseAgent(ABC):
 
     def get_available_tools(self) -> List[Dict[str, Any]]:
         """
-        Return the tool definitions in a format suitable for LLMs (e.g., OpenAI functions).
+        Return the tool definitions in a format suitable for LLMs.
         Converts Pydantic models to dictionaries.
         """
         return [tool.model_dump(exclude_none=True) for tool in self.tools]
@@ -66,15 +75,122 @@ class BaseAgent(ABC):
             history: The conversation history.
 
         Returns:
-            An AgentOutput object containing the response, notifications, and tool usage info.
+            An AgentOutput object containing the response and related information.
         """
         pass
 
-    # Helper method often needed by agents
+    def check_content_safety(self, 
+                           message: str, 
+                           history: Optional[List[Dict[str, Any]]] = None) -> FilterResult:
+        """
+        Check if content is safe using the content filter.
+
+        Args:
+            message: The content to check
+            history: Optional conversation history for context
+
+        Returns:
+            FilterResult containing the analysis details
+        """
+        return content_filter.check_content(
+            content=message,
+            language=self.language,
+            context=history
+        )
+
+    def is_content_safe(self, 
+                       message: str, 
+                       history: Optional[List[Dict[str, Any]]] = None) -> bool:
+        """
+        Check if content is safe (below maximum severity threshold).
+
+        Args:
+            message: The content to check
+            history: Optional conversation history for context
+
+        Returns:
+            True if content is safe, False otherwise
+        """
+        return content_filter.is_content_safe(
+            content=message,
+            language=self.language,
+            context=history,
+            max_severity=self.max_severity_threshold
+        )
+
+    def filter_harmful_content(self, 
+                             message: str, 
+                             history: Optional[List[Dict[str, Any]]] = None) -> str:
+        """
+        Filter out harmful content from the message.
+
+        Args:
+            message: The content to filter
+            history: Optional conversation history for context
+
+        Returns:
+            Filtered content with harmful parts replaced by asterisks
+        """
+        return content_filter.filter_harmful_content(
+            content=message,
+            language=self.language,
+            context=history
+        )
+
+    def create_safety_violation_response(self, filter_result: FilterResult) -> AgentOutput:
+        """
+        Create a standardized response for content safety violations.
+
+        Args:
+            filter_result: The FilterResult from content checking
+
+        Returns:
+            AgentOutput with appropriate response and notifications
+        """
+        category_messages = {
+            "hate_speech": "discriminatory or hateful content",
+            "violence": "violent or threatening content",
+            "adult_content": "explicit or inappropriate content",
+            "personal_info": "sensitive personal information",
+            "harmful_topics": "harmful or controversial topics",
+            "profanity": "inappropriate language",
+            "spam": "promotional or spam content"
+        }
+        
+        # Create specific message based on violated categories
+        violation_details = [
+            category_messages.get(category, "inappropriate content")
+            for category in filter_result.categories
+        ]
+        
+        response = (
+            "I apologize, but I cannot process messages containing "
+            f"{', '.join(violation_details)}. Please rephrase your request "
+            "appropriately, and I'll be happy to assist you."
+        )
+        
+        return AgentOutput(
+            response=response,
+            notifications=[{
+                "type": "content_violation",
+                "severity": filter_result.severity,
+                "categories": filter_result.categories,
+                "timestamp": datetime.utcnow().isoformat()
+            }],
+            filter_result=filter_result
+        )
+
     def _extract_room_number(self, history: List[Dict[str, Any]]) -> Optional[str]:
-        """Extracts room number from conversation history (example helper)."""
-        import re
-        for entry in reversed(history): # Check recent messages first
+        """
+        Extracts room number from conversation history.
+        
+        Args:
+            history: The conversation history to search
+            
+        Returns:
+            Room number if found, None otherwise
+        """
+        for entry in reversed(history):  # Check recent messages first
             if entry.get('role') == 'user' or entry.get('type') == 'human':
                 content = entry.get('content', '')
                 # More robust regex to handle variations like "room 101", "room number 101", "room:101"
@@ -82,3 +198,60 @@ class BaseAgent(ABC):
                 if match:
                     return match.group(1)
         return None
+
+    def _extract_booking_reference(self, 
+                                 message: str, 
+                                 history: List[Dict[str, Any]]) -> Optional[str]:
+        """
+        Extract booking reference from message or history.
+        
+        Args:
+            message: Current message to check
+            history: Conversation history to search
+            
+        Returns:
+            Booking reference if found, None otherwise
+        """
+        patterns = [
+            r'booking[:\s]*([A-Z0-9]{6,})',
+            r'reservation[:\s]*([A-Z0-9]{6,})',
+            r'reference[:\s]*([A-Z0-9]{6,})'
+        ]
+        
+        # Check current message first
+        for pattern in patterns:
+            match = re.search(pattern, message, re.IGNORECASE)
+            if match:
+                return match.group(1)
+        
+        # Check history if not found in current message
+        for entry in reversed(history):
+            content = entry.get('content', '')
+            for pattern in patterns:
+                match = re.search(pattern, content, re.IGNORECASE)
+                if match:
+                    return match.group(1)
+        
+        return None
+
+    def _is_in_conversation(self, 
+                          history: List[Dict[str, Any]], 
+                          lookback: int = 3) -> bool:
+        """
+        Check if we're in an ongoing conversation with this agent.
+        
+        Args:
+            history: Conversation history to check
+            lookback: Number of messages to check (default: 3)
+            
+        Returns:
+            True if in conversation with this agent, False otherwise
+        """
+        if not history:
+            return False
+            
+        recent_history = history[-lookback:]  # Look at last few messages
+        for entry in recent_history:
+            if entry.get('agent') == self.name:
+                return True
+        return False

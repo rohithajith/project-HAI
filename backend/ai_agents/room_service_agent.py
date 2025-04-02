@@ -1,291 +1,228 @@
-import re
 from typing import List, Dict, Any, Optional
+from pydantic import BaseModel, Field
+from datetime import datetime
+from .base_agent import BaseAgent, AgentOutput, ToolDefinition, ToolParameters, ToolParameterProperty
 
-from .base_agent import BaseAgent, ToolDefinition, ToolParameters, ToolParameterProperty, AgentOutput
-# Assuming a similar notification service exists in Python
-# from backend.services.notification_service import notification_service
-
-# Placeholder for the notification service if not yet implemented
-class MockNotificationService:
-    async def send_room_notification(self, room_number: str, message: str):
-        print(f"--- NOTIFICATION to Room {room_number}: {message} ---")
-    async def send_system_notification(self, notification_data: Dict[str, Any]):
-         print(f"--- SYSTEM NOTIFICATION: {notification_data} ---")
-
-notification_service = MockNotificationService() # Replace with actual import when available
-
+class RoomServiceOrder(BaseModel):
+    """Schema for room service orders."""
+    room_number: str = Field(..., description="Room number for delivery")
+    items: List[Dict[str, Any]] = Field(..., description="List of ordered items")
+    special_instructions: Optional[str] = Field(None, description="Special delivery instructions")
+    delivery_time: Optional[datetime] = Field(None, description="Requested delivery time")
+    dietary_restrictions: Optional[List[str]] = Field(None, description="Dietary restrictions or allergies")
 
 class RoomServiceAgent(BaseAgent):
-    name: str = "RoomServiceAgent"
-    priority: int = 1 # Same priority as MaintenanceAgent in JS, adjust if needed
-
-    tools: List[ToolDefinition] = [
-        ToolDefinition(
-            name='order_food',
-            description='Place food order from room service menu',
-            parameters=ToolParameters(
-                properties={
-                    'items': ToolParameterProperty(
-                        type='array',
-                        description='List of food items to order (e.g., ["burger", "fries"])',
-                        # Pydantic v2 doesn't directly support 'items' like JSON schema.
-                        # We rely on description and LLM understanding or further validation.
-                        # Example for LLM: items: List[str] = Field(..., description="List...")
-                    ),
-                    'special_instructions': ToolParameterProperty(
-                        type='string',
-                        description='Any special preparation instructions (e.g., "no onions")'
-                    )
-                },
-                required=['items']
+    """Agent responsible for handling room service requests."""
+    
+    def __init__(self):
+        self.name = "room_service_agent"
+        self.priority = 8  # Medium-high priority for guest comfort
+        
+        # Define available tools
+        self.tools = [
+            ToolDefinition(
+                name="check_menu_availability",
+                description="Check if menu items are currently available",
+                parameters=ToolParameters(
+                    type="object",
+                    properties={
+                        "item_ids": ToolParameterProperty(
+                            type="array",
+                            description="List of menu item IDs to check"
+                        ),
+                        "time": ToolParameterProperty(
+                            type="string",
+                            description="Time to check availability for"
+                        )
+                    },
+                    required=["item_ids"]
+                )
+            ),
+            ToolDefinition(
+                name="place_order",
+                description="Place a room service order",
+                parameters=ToolParameters(
+                    type="object",
+                    properties={
+                        "room_number": ToolParameterProperty(
+                            type="string",
+                            description="Room number for delivery"
+                        ),
+                        "order_items": ToolParameterProperty(
+                            type="array",
+                            description="List of items to order"
+                        ),
+                        "special_instructions": ToolParameterProperty(
+                            type="string",
+                            description="Special delivery instructions"
+                        )
+                    },
+                    required=["room_number", "order_items"]
+                )
             )
-        ),
-        ToolDefinition(
-            name='order_drinks',
-            description='Place drink order from room service menu',
-            parameters=ToolParameters(
-                properties={
-                    'beverages': ToolParameterProperty(
-                        type='array',
-                        description='List of beverages to order (e.g., ["coke", "water"])',
-                        # Similar note as 'items' above for array type handling
-                    ),
-                    'ice_preference': ToolParameterProperty(
-                        type='string',
-                        description='Ice preference for drinks',
-                        enum=['none', 'light', 'regular', 'extra'],
-                        default='regular' # Added a default
-                    )
-                },
-                required=['beverages']
-            )
-        )
-    ]
+        ]
 
     def should_handle(self, message: str, history: List[Dict[str, Any]]) -> bool:
-        """Check if the message relates to room service (food/drinks)."""
-        lower_message = message.lower()
-        
-        # Expanded keyword list for better detection
-        keywords = [
-            'room service', 'food', 'drink', 'beverage', 'menu', 'order',
-            'eat', 'hungry', 'thirsty', 'snack', 'meal', 'burger', 'fries',
-            'pizza', 'sandwich', 'breakfast', 'lunch', 'dinner', 'coke', 'water',
-            'juice', 'soda', 'coffee', 'tea', 'ice', 'get me', 'bring me'
+        """Determine if this agent should handle the message."""
+        room_service_keywords = [
+            "room service", "food", "drink", "breakfast", "lunch", "dinner",
+            "menu", "order", "hungry", "thirsty", "meal", "snack",
+            "bring to room", "delivery", "towel", "towels", "housekeeping",
+            "clean", "amenities", "supplies"
         ]
         
-        # Check for room number in message or history to improve context awareness
-        has_room_context = 'room' in lower_message or self._extract_room_number(history) is not None
+        message_lower = message.lower()
         
-        # More aggressive matching - if we have room context and food/drink terms
-        if has_room_context:
-            return any(keyword in lower_message for keyword in keywords)
+        # Check for room service keywords
+        has_keywords = any(keyword in message_lower for keyword in room_service_keywords)
         
-        # Otherwise use stricter matching
-        return any(keyword in lower_message for keyword in keywords)
+        # Check if we're in an ongoing room service conversation
+        in_conversation = self._is_in_room_service_conversation(history)
+        
+        return has_keywords or in_conversation
 
     async def process(self, message: str, history: List[Dict[str, Any]]) -> AgentOutput:
-        """
-        Process a room service request using improved keyword matching.
-        """
-        lower_message = message.lower()
-        room_number = self._extract_room_number(history) or 'unknown'
-        selected_tool_name: Optional[str] = None
-        tool_args: Dict[str, Any] = {}
+        """Process room service related requests."""
+        # Content filtering
+        if self._contains_harmful_content(message):
+            return AgentOutput(
+                response="I apologize, but I cannot process messages containing inappropriate "
+                        "content. How else may I assist you with room service?"
+            )
 
-        # More comprehensive keyword sets
-        food_keywords = ['food', 'eat', 'hungry', 'snack', 'meal', 'menu', 'order', 'sandwich', 'burger', 'fries',
-                         'pizza', 'breakfast', 'lunch', 'dinner', 'club', 'salad', 'pasta', 'steak', 'chicken']
+        # Extract room number
+        room_number = self._extract_room_number(history)
         
-        drink_keywords = ['drink', 'beverage', 'thirsty', 'coke', 'water', 'juice', 'soda', 'coffee', 'tea',
-                          'beer', 'wine', 'cocktail', 'sprite', 'pepsi', 'lemonade']
+        if not room_number:
+            return AgentOutput(
+                response="To help you with room service, could you please provide your room number?"
+            )
 
-        # Common food items to detect
-        food_items = ['burger', 'fries', 'pizza', 'sandwich', 'salad', 'pasta', 'steak', 'chicken', 'fish',
-                      'breakfast', 'lunch', 'dinner', 'snack', 'meal', 'club']
-        
-        # Common drink items to detect
-        drink_items = ['coke', 'water', 'juice', 'soda', 'coffee', 'tea', 'beer', 'wine', 'cocktail',
-                       'sprite', 'pepsi', 'lemonade']
-
-        # Check for keywords, giving priority to food if both types are mentioned
-        is_food_request = any(k in lower_message for k in food_keywords)
-        is_drink_request = any(k in lower_message for k in drink_keywords)
-
-        # Extract food items from message
-        extracted_food_items = []
-        for item in food_items:
-            if item in lower_message:
-                extracted_food_items.append(item)
-        
-        # Extract drink items from message
-        extracted_drink_items = []
-        for item in drink_items:
-            if item in lower_message:
-                extracted_drink_items.append(item)
-
-        # If we found specific food items, it's definitely a food request
-        if extracted_food_items:
-            is_food_request = True
-            
-        # If we found specific drink items, it's definitely a drink request
-        if extracted_drink_items:
-            is_drink_request = True
-
-        if is_food_request:
-            selected_tool_name = 'order_food'
-            # Use extracted items if available, otherwise fallback to basic extraction
-            if extracted_food_items:
-                items = extracted_food_items
-            else:
-                # Simplified arg extraction as fallback
-                items = [word for word in message.split() if word.lower() in food_keywords or len(word) > 3]
-                
-            # Extract special instructions
-            special_instructions = ""
-            if "no " in lower_message or "without " in lower_message:
-                # Simple extraction of special instructions
-                for phrase in ["no ", "without "]:
-                    if phrase in lower_message:
-                        idx = lower_message.find(phrase)
-                        end_idx = lower_message.find(" ", idx + len(phrase) + 5)  # Look for space after the word
-                        if end_idx == -1:
-                            end_idx = len(lower_message)
-                        special_instructions += lower_message[idx:end_idx] + " "
-            
-            tool_args = {'items': items or ["food order"], 'special_instructions': special_instructions.strip()}
-            print(f"Selected tool 'order_food' with args: {tool_args}")  # Debug log
-
-        elif is_drink_request:
-            selected_tool_name = 'order_drinks'
-            # Use extracted items if available, otherwise fallback to basic extraction
-            if extracted_drink_items:
-                beverages = extracted_drink_items
-            else:
-                # Simplified arg extraction as fallback
-                beverages = [word for word in message.split() if word.lower() in drink_keywords or len(word) > 3]
-                
-            # Determine ice preference
-            ice_pref = 'regular'
-            if 'no ice' in lower_message: ice_pref = 'none'
-            elif 'light ice' in lower_message: ice_pref = 'light'
-            elif 'extra ice' in lower_message: ice_pref = 'extra'
-            
-            tool_args = {'beverages': beverages or ["drink order"], 'ice_preference': ice_pref}
-            print(f"Selected tool 'order_drinks' with args: {tool_args}")  # Debug log
-
-        # Execute the selected tool if one was identified
-        if selected_tool_name == 'order_food':
-            return await self._handle_food_order(room_number, tool_args)
-        elif selected_tool_name == 'order_drinks':
-            return await self._handle_drink_order(room_number, tool_args)
+        # Determine the type of request
+        if self._is_menu_request(message):
+            return await self._handle_menu_request(room_number)
+        elif self._is_order_request(message):
+            return await self._handle_order_request(message, room_number)
+        elif self._is_status_request(message):
+            return await self._handle_status_request(room_number)
         else:
-            # If should_handle was true but process didn't select a tool, return non-handling output
-            # This signals the agent manager to try the next agent or fallback
-            return AgentOutput(response="", tool_used=False, notifications=[])
+            return await self._handle_general_inquiry(message, room_number)
 
-    async def _handle_food_order(self, room_number: str, args: Dict[str, Any]) -> AgentOutput:
-        """Simulates placing a food order."""
-        items = args.get('items', ['Unknown item'])
-        instructions = args.get('special_instructions', 'None')
-        items_str = ", ".join(items)
+    def _contains_harmful_content(self, message: str) -> bool:
+        """Check for harmful or inappropriate content."""
+        harmful_keywords = [
+            "lgbtq", "rape", "bomb", "terror", "politics",
+            "weapon", "drugs", "explicit", "offensive"
+        ]
+        message_lower = message.lower()
+        return any(keyword in message_lower for keyword in harmful_keywords)
 
-        await notification_service.send_room_notification(
-            room_number,
-            f"Food order placed: {items_str}. Instructions: {instructions}"
-        )
-        await notification_service.send_system_notification({
-             'type': 'room_service_food',
-             'roomNumber': room_number,
-             'items': items,
-             'instructions': instructions
-        })
+    def _is_in_room_service_conversation(self, history: List[Dict[str, Any]]) -> bool:
+        """Check if we're in an ongoing room service conversation."""
+        if not history:
+            return False
+            
+        # Check last few messages for room service context
+        recent_history = history[-3:]  # Look at last 3 messages
+        for entry in recent_history:
+            if entry.get('agent') == self.name:
+                return True
+        return False
 
-        response_message = f"Your food order ({items_str}) has been placed for room {room_number}. It should arrive in about 30 minutes."
-        if instructions:
-            response_message += f" Special instructions: {instructions}."
+    def _is_menu_request(self, message: str) -> bool:
+        """Check if the message is requesting the menu."""
+        menu_keywords = ["menu", "what do you have", "what's available", "can i see"]
+        message_lower = message.lower()
+        return any(keyword in message_lower for keyword in menu_keywords)
 
+    def _is_order_request(self, message: str) -> bool:
+        """Check if the message is placing an order."""
+        order_keywords = ["order", "bring", "i want", "i would like", "can i get"]
+        message_lower = message.lower()
+        return any(keyword in message_lower for keyword in order_keywords)
+
+    def _is_status_request(self, message: str) -> bool:
+        """Check if the message is requesting order status."""
+        status_keywords = ["status", "where is", "how long", "when will"]
+        message_lower = message.lower()
+        return any(keyword in message_lower for keyword in status_keywords)
+
+    async def _handle_menu_request(self, room_number: str) -> AgentOutput:
+        """Handle requests to see the menu."""
         return AgentOutput(
-            response=response_message,
+            response="Here's our current room service menu. All prices are in USD and "
+                    "include service charge and taxes:\n\n"
+                    "🍳 BREAKFAST (6:00 AM - 11:00 AM)\n"
+                    "- Continental Breakfast: $25\n"
+                    "- American Breakfast: $30\n"
+                    "- Healthy Start: $28\n\n"
+                    "🍽️ ALL DAY DINING (11:00 AM - 10:00 PM)\n"
+                    "- Club Sandwich: $22\n"
+                    "- Caesar Salad: $18\n"
+                    "- Burger & Fries: $25\n\n"
+                    "Would you like to place an order?",
             notifications=[{
-                'event': 'room_service_food', # Changed 'type' to 'event'
-                'payload': {                  # Wrapped details in 'payload'
-                    'roomNumber': room_number,
-                    'items': items,
-                    'instructions': instructions
-                }
-            }],
-            tool_used=True,
-            tool_name='order_food',
-            tool_args=args
+                "type": "menu_viewed",
+                "room_number": room_number,
+                "timestamp": datetime.utcnow().isoformat()
+            }]
         )
 
-    async def _handle_drink_order(self, room_number: str, args: Dict[str, Any]) -> AgentOutput:
-        """Simulates placing a drink order."""
-        beverages = args.get('beverages', ['Unknown beverage'])
-        ice = args.get('ice_preference', 'regular')
-        beverages_str = ", ".join(beverages)
-
-        await notification_service.send_room_notification(
-            room_number,
-            f"Drink order placed: {beverages_str}. Ice: {ice}"
-        )
-        await notification_service.send_system_notification({
-             'type': 'room_service_drink',
-             'roomNumber': room_number,
-             'beverages': beverages,
-             'ice_preference': ice
-        })
-
-        response_message = f"Your drink order ({beverages_str}) has been placed for room {room_number} with {ice} ice. It should arrive in about 15 minutes."
+    async def _handle_order_request(self, message: str, room_number: str) -> AgentOutput:
+        """Handle food order requests."""
+        # TODO: Implement order parsing and validation
         return AgentOutput(
-            response=response_message,
+            response="I'll help you place your order. To ensure accuracy, please confirm:\n"
+                    "1. The items you'd like to order\n"
+                    "2. Any special instructions (allergies, preferences)\n"
+                    "3. Preferred delivery time (if not ASAP)\n\n"
+                    "You can say something like 'I'd like a Club Sandwich and Caesar Salad "
+                    "delivered at 2 PM, no onions please.'",
             notifications=[{
-                'event': 'room_service_drink', # Changed 'type' to 'event'
-                'payload': {                   # Wrapped details in 'payload'
-                    'roomNumber': room_number,
-                    'beverages': beverages,
-                    'ice_preference': ice
-                }
-            }],
-            tool_used=True,
-            tool_name='order_drinks',
-            tool_args=args
+                "type": "order_started",
+                "room_number": room_number,
+                "timestamp": datetime.utcnow().isoformat()
+            }]
         )
 
-# Example usage (for testing purposes)
-if __name__ == '__main__':
-    import asyncio
+    async def _handle_status_request(self, room_number: str) -> AgentOutput:
+        """Handle order status inquiries."""
+        # TODO: Implement order status checking
+        return AgentOutput(
+            response="Let me check the status of your order. One moment please...",
+            notifications=[{
+                "type": "status_check",
+                "room_number": room_number,
+                "timestamp": datetime.utcnow().isoformat()
+            }]
+        )
 
-    async def test():
-        agent = RoomServiceAgent()
-        history = [{'role': 'user', 'content': 'I am in room 205.'}]
-        message1 = "I'm hungry, can I order a club sandwich and fries?"
-        message2 = "I'd like to get a coke with light ice and a bottle of water."
-        message3 = "What's on the room service menu?" # Should trigger food tool by current logic
-
-        print("Available tools:", agent.get_available_tools())
-
-        print(f"\nTesting message 1: '{message1}'")
-        if agent.should_handle(message1, history):
-            output1 = await agent.process(message1, history)
-            print("Output 1:", output1)
-        else:
-            print("Agent decided not to handle message 1.")
-
-        print(f"\nTesting message 2: '{message2}'")
-        if agent.should_handle(message2, history):
-            output2 = await agent.process(message2, history)
-            print("Output 2:", output2)
-        else:
-            print("Agent decided not to handle message 2.")
-
-        print(f"\nTesting message 3: '{message3}'")
-        if agent.should_handle(message3, history):
-            output3 = await agent.process(message3, history)
-            print("Output 3:", output3)
-        else:
-            print("Agent decided not to handle message 3.")
-
-
-    asyncio.run(test())
+    async def _handle_general_inquiry(self, message: str, room_number: str) -> AgentOutput:
+        """Handle general room service and housekeeping inquiries."""
+        # Check for towel request
+        if "towel" in message.lower():
+            return AgentOutput(
+                response="I'll arrange to have fresh towels delivered to your room right away. "
+                        "Is there anything specific you need (bath towels, hand towels, etc.)?",
+                notifications=[{
+                    "type": "housekeeping_request",
+                    "request_type": "towels",
+                    "room_number": room_number,
+                    "timestamp": datetime.utcnow().isoformat()
+                }]
+            )
+        
+        # Default response for other inquiries
+        return AgentOutput(
+            response="I can help you with room service orders, housekeeping items, or checking "
+                    "your request status. Would you like to:\n"
+                    "1. See our menu?\n"
+                    "2. Place an order?\n"
+                    "3. Request housekeeping items?\n"
+                    "4. Check request status?",
+            notifications=[{
+                "type": "general_inquiry",
+                "room_number": room_number,
+                "timestamp": datetime.utcnow().isoformat()
+            }]
+        )

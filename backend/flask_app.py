@@ -1,4 +1,3 @@
-
 import eventlet
 eventlet.monkey_patch()
 
@@ -9,11 +8,11 @@ import sys
 import json
 import logging
 from local_model_chatbot import load_model_and_tokenizer
-from ai_agents.agent_manager import AgentManagerCorrected
+from ai_agents.agent_manager_corrected import AgentManagerCorrected
 
 # Configure logging
 logging.basicConfig(
-    level=logging.DEBUG,  # Set to DEBUG for maximum verbosity
+    level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
 )
 logger = logging.getLogger("flask_app")
@@ -29,26 +28,18 @@ socketio = SocketIO(
     app,
     cors_allowed_origins="*",
     async_mode='eventlet',
-    async_handlers=True,  # Enable async handlers
-    logger=True,  # Enable SocketIO logger
-    engineio_logger=True  # Enable Engine.IO logger
+    async_handlers=True,
+    logger=True,
+    engineio_logger=True
 )
 
-# Initialize agent manager
+# Initialize agent manager with local model
 try:
     agent_manager = AgentManagerCorrected()
-    logger.info("Agent Manager initialized successfully")
+    logger.info("Agent Manager initialized successfully with local model")
 except Exception as e:
     logger.error(f"Failed to initialize Agent Manager: {e}")
     agent_manager = None
-
-# Load LLM model and tokenizer
-try:
-    model, tokenizer, device = load_model_and_tokenizer()
-    logger.info("LLM model loaded successfully")
-except Exception as e:
-    logger.error(f"Failed to load LLM model: {e}")
-    model, tokenizer, device = None, None, None
 
 @app.route('/')
 def index():
@@ -110,38 +101,9 @@ def process_message(message, history):
         logger.debug(f"Starting process_message with message: '{message}'")
         logger.debug(f"Message history length: {len(history)}")
         
-        # First try LLM directly since we know it works from our tests
-        if model and tokenizer:
-            try:
-                logger.debug("LLM components available, attempting to generate response...")
-                
-                logger.debug("Tokenizing input...")
-                inputs = tokenizer(message, return_tensors="pt").to(device)
-                logger.debug(f"Input tokenized, shape: {inputs.input_ids.shape}")
-                
-                logger.debug("Generating with model...")
-                outputs = model.generate(**inputs, max_length=100)
-                logger.debug(f"Generation complete, output shape: {outputs.shape}")
-                
-                logger.debug("Decoding response...")
-                response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-                logger.debug(f"Decoded response length: {len(response)}")
-                logger.info(f"LLM generated response: {response}")
-                
-                # Emit response synchronously since we're in a greenthread
-                logger.debug("Emitting response via socketio...")
-                socketio.emit('message', {'response': response})
-                logger.info("Response emitted successfully")
-                return
-            except Exception as e:
-                logger.error(f"Error generating LLM response: {e}", exc_info=True)
-                logger.debug("Will attempt agent manager as fallback...")
-                
-        # Then try agent manager as fallback
         if agent_manager:
             try:
                 logger.info("Processing with agent manager...")
-                # Since agent_manager.process is async, we need to run it in the main thread
                 result = agent_manager.process(message, history)
                 if result and result.response:
                     logger.info(f"Agent manager generated response: {result.response}")
@@ -155,7 +117,7 @@ def process_message(message, history):
             except Exception as e:
                 logger.error(f"Error processing with agent: {e}", exc_info=True)
         
-        # If we get here, neither LLM nor agent manager worked
+        # If we get here, agent manager didn't work
         logger.warning("No response generated, falling back to echo mode")
         socketio.emit('message', {'response': f"Echo: {message} (AI components not available)"})
             

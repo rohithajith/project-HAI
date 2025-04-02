@@ -18,6 +18,7 @@ pip install bitsandbytes-cuda110 bitsandbytes
 REM Install accelerate
 pip install accelerate
 pip install transformers
+pip install -r requirements.txt
 
 python .\download_hfmodel.py
 python .\teste.py
