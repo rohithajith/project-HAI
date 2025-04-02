@@ -60,10 +60,29 @@ class BaseAgent(ABC):
 
     def get_available_tools(self) -> List[Dict[str, Any]]:
         """
-        Return the tool definitions in a format suitable for LLMs.
-        Converts Pydantic models to dictionaries.
+        Return the tool definitions in a format suitable for LangGraph's create_react_agent.
+        Converts ToolDefinition objects to the expected LangGraph tool format.
         """
-        return [tool.model_dump(exclude_none=True) for tool in self.tools]
+        formatted_tools = []
+        for tool in self.tools:
+            formatted_tool = {
+                "type": "function",
+                "function": {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": {
+                        "type": tool.parameters.type,
+                        "properties": {
+                            name: prop.model_dump(exclude_none=True)
+                            for name, prop in tool.parameters.properties.items()
+                        }
+                    }
+                }
+            }
+            if tool.parameters.required:
+                formatted_tool["function"]["parameters"]["required"] = tool.parameters.required
+            formatted_tools.append(formatted_tool)
+        return formatted_tools
 
     @abstractmethod
     async def process(self, message: str, history: List[Dict[str, Any]]) -> AgentOutput:
@@ -255,3 +274,42 @@ class BaseAgent(ABC):
             if entry.get('agent') == self.name:
                 return True
         return False
+        
+    async def handle_tool_call(self, tool_name: str, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Handle a tool call by executing the appropriate tool logic.
+        
+        Args:
+            tool_name: Name of the tool to execute
+            inputs: Tool input parameters
+            
+        Returns:
+            Tool execution results
+        """
+        # Find the tool definition
+        tool = next((t for t in self.tools if t.name == tool_name), None)
+        if not tool:
+            raise ValueError(f"Tool {tool_name} not found")
+            
+        # Validate inputs against tool parameters
+        required = tool.parameters.required or []
+        for param in required:
+            if param not in inputs:
+                raise ValueError(f"Missing required parameter: {param}")
+                
+        # Execute tool-specific logic
+        if tool_name == "check_menu_availability":
+            # Example implementation
+            return {
+                "available": True,
+                "estimated_wait": "15 minutes"
+            }
+        elif tool_name == "place_order":
+            # Example implementation
+            return {
+                "order_id": "ORD123",
+                "status": "confirmed",
+                "estimated_delivery": "30 minutes"
+            }
+        else:
+            raise NotImplementedError(f"Tool {tool_name} not implemented")

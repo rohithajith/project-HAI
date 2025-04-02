@@ -25,3 +25,6 @@ safetensors>=0.3.1    # For model loading
 # Testing dependencies
 unittest2>=1.1.0
 pytest>=7.3.1
+pytest-asyncio>=0.21.0
+pytest-mock>=3.11.1
+pytest-timeout>=2.1.0

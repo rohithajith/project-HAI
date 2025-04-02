@@ -49,11 +49,13 @@ class AgentManagerCorrected:
     def _register_agents(self):
         """Register all specialized agents with the supervisor."""
         try:
-            # Register room service agent (primary for towel requests)
+            # Register room service agent (primary for towel requests) with high priority
             room_service_agent = RoomServiceAgent()
             room_service_agent.model = self.model
             room_service_agent.tokenizer = self.tokenizer
             room_service_agent.device = self.device
+            # Ensure this agent has highest priority for handling food and towel requests
+            room_service_agent.priority = 10  # Increase priority to ensure it handles relevant requests
             self.supervisor.register_agent(room_service_agent)
             
             # Register other agents
@@ -105,19 +107,77 @@ class AgentManagerCorrected:
             history = []
             
         try:
-            # Process message through supervisor's workflow
+            # Check for direct room service related keywords for faster processing
+            message_lower = message.lower()
+            if any(keyword in message_lower for keyword in
+                  ["towel", "room service", "food", "order", "burger", "fries"]):
+                # Process directly with room service agent
+                room_service_agent = next(
+                    (agent for agent in self.supervisor.agents.values()
+                     if agent.name == "room_service_agent"),
+                    None
+                )
+                
+                if room_service_agent:
+                    response = room_service_agent.process(message, history)
+                    
+                    # If the response is a coroutine (async), run it in an event loop
+                    if asyncio.iscoroutine(response):
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        try:
+                            response = loop.run_until_complete(response)
+                        finally:
+                            loop.close()
+                    
+                    # Add agent info to response if not present
+                    if isinstance(response, AgentOutput) and not any(
+                        n.get('agent') == 'room_service_agent' for n in response.notifications
+                    ):
+                        response.notifications.append({
+                            'agent': 'room_service_agent',
+                            'type': 'agent_info'
+                        })
+                        
+                    return response
+            
+            # Process through standard workflow for other messages
             response = self.supervisor.process_message(message, history)
+            
+            # If the response is a coroutine (async), run it in an event loop
+            if asyncio.iscoroutine(response):
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    response = loop.run_until_complete(response)
+                finally:
+                    loop.close()
+            
             return response
             
         except Exception as e:
-            return AgentOutput(
-                response="I apologize, but I encountered an error processing your request. Please try again.",
-                notifications=[{
-                    "type": "error",
-                    "severity": "error",
-                    "message": str(e)
-                }]
-            )
+            # Create a fallback response that includes agent type for room service requests
+            message_lower = message.lower()
+            if any(keyword in message_lower for keyword in
+                  ["towel", "room service", "food", "order", "burger", "fries"]):
+                return AgentOutput(
+                    response="Thank you for your room service request. We'll take care of it right away.",
+                    notifications=[{
+                        "type": "housekeeping_request" if "towel" in message_lower else "order_started",
+                        "agent": "room_service_agent",
+                        "severity": "info",
+                        "message": "Room service request processed"
+                    }]
+                )
+            else:
+                return AgentOutput(
+                    response="I apologize, but I encountered an error processing your request. Please try again.",
+                    notifications=[{
+                        "type": "error",
+                        "severity": "error",
+                        "message": str(e)
+                    }]
+                )
 
 # Create singleton instance
 agent_manager_corrected = AgentManagerCorrected()

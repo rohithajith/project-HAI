@@ -25,25 +25,40 @@
             padding: 10px 0;
         }
         
-        nav ul {
+        .nav-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        .nav-logo a {
+            color: white;
+            text-decoration: none;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        .nav-links {
             list-style-type: none;
             margin: 0;
             padding: 0;
             display: flex;
-            justify-content: center;
         }
         
-        nav li {
+        .nav-links li {
             margin: 0 15px;
         }
         
-        nav a {
+        .nav-link {
             color: white;
             text-decoration: none;
             font-weight: bold;
         }
         
-        nav a:hover {
+        .nav-link:hover {
             text-decoration: underline;
         }
         
@@ -105,22 +120,33 @@
             background-color: #4CAF50;
             color: white;
         }
+        
+        .main-content {
+            min-height: calc(100vh - 120px);
+        }
     </style>
     {% block styles %}{% endblock %}
     {% block head %}{% endblock %}
 </head>
 <body>
     <nav>
-        <ul>
-            <li><a href="/">Guest Chatbot</a></li>
-            <li><a href="/admin">Admin Dashboard</a></li>
-            <li><a href="/room-service">Room Service</a></li>
-        </ul>
+        <div class="nav-container">
+            <div class="nav-logo">
+                <a href="/">Hotel AI</a>
+            </div>
+            <ul class="nav-links">
+                <li><a href="/" class="nav-link">Guest Chatbot</a></li>
+                <li><a href="/admin" class="nav-link">Admin Dashboard</a></li>
+                <li><a href="/room-service" class="nav-link">Room Service</a></li>
+            </ul>
+        </div>
     </nav>
-    
-    <div class="container">
-        {% block content %}{% endblock %}
-    </div>
+
+    <main class="main-content">
+        <div class="container">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
     
     {% block scripts %}{% endblock %}
 </body>

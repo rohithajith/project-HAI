@@ -1,112 +1,196 @@
-import unittest
-import socketio
-import time
-import json
-from flask import Flask
-from flask_socketio import SocketIO
-from ai_agents.agent_manager import AgentManagerCorrected
-from flask_app import app, socketio as server_socketio
-from local_model_chatbot import load_model_and_tokenizer
-import logging
+import asyncio
+import pytest
+from datetime import datetime
+from ai_agents.room_service_agent import RoomServiceAgent
+from ai_agents.base_agent import AgentOutput
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+class TestRoomServiceAgent:
+    def setup_method(self):
+        """Initialize the room service agent before each test."""
+        self.agent = RoomServiceAgent()
 
-class TestAgentSystem(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        """Load the model once for all tests"""
-        logger.info("Loading local model for testing...")
-        cls.model, cls.tokenizer, cls.device = load_model_and_tokenizer()
-        if not all([cls.model, cls.tokenizer, cls.device]):
-            raise Exception("Failed to load local model and tokenizer")
-        logger.info("Local model loaded successfully")
+    @pytest.mark.asyncio
+    async def test_burger_and_fries_order(self):
+        """Test ordering a burger and fries in a specific room."""
+        # Simulate processing delay
+        await asyncio.sleep(5)
 
-    def setUp(self):
-        # Set up test client
-        self.app = app
-        self.client = self.app.test_client()
-        
-        # Set up SocketIO test client
-        self.socketio_client = socketio.Client()
-        
-        # Store received messages
-        self.received_messages = []
-        
-        # Initialize agent manager with local model
-        self.agent_manager = AgentManagerCorrected()
-        
-        # Connect to server
-        try:
-            self.socketio_client.connect('http://localhost:5002')
-            logger.info("Connected to WebSocket server")
-        except Exception as e:
-            logger.error(f"Failed to connect to server: {e}")
-            raise
-            
-    def tearDown(self):
-        # Disconnect socket client
-        if self.socketio_client.connected:
-            self.socketio_client.disconnect()
-            logger.info("Disconnected from WebSocket server")
-            
-    def test_room_service_request(self):
-        """Test the room service request flow with all agents"""
-        logger.info("\nTesting room service request flow...")
-        
-        # Set up message handler
-        @self.socketio_client.on('message')
-        def handle_message(data):
-            logger.info(f"Received response: {data}")
-            self.received_messages.append(data)
-        
-        # Test message for towel request
-        test_message = "hi, can i get towels"
-        logger.info(f"\nSending test message: {test_message}")
-        
-        # Emit test message
-        self.socketio_client.emit('message', {
-            'message': test_message,
-            'history': []
-        })
-        
-        # Wait for response (max 10 seconds)
-        timeout = 10
-        start_time = time.time()
-        while time.time() - start_time < timeout:
-            if self.received_messages:
-                break
-            time.sleep(0.1)
-            
-        # Assert we got a response
-        self.assertTrue(len(self.received_messages) > 0, "No response received from server")
-        
-        # Check response content
-        response = self.received_messages[0]
-        self.assertIn('response', response, "Response missing 'response' field")
-        
-        # Log response for verification
-        logger.info(f"\nResponse received: {response['response']}")
-        
-        # Check for notifications if any
-        if 'notifications' in response:
-            logger.info(f"Notifications: {response['notifications']}")
-            
-        # Verify room service agent processed request
-        self.assertNotIn("Echo:", response['response'], 
-                        "Response appears to be echo mode, agents may not be working")
-        
-        # Verify response mentions towels
-        self.assertIn("towel", response['response'].lower(), 
-                     "Response should acknowledge towel request")
+        message = "I am in room 102. I would like to order a burger and fries"
+        history = []
 
-def run_tests():
-    logger.info("Starting agent system tests...")
-    unittest.main(argv=[''], verbosity=2)
+        # Process the message
+        result = await self.agent.process(message, history)
 
-if __name__ == '__main__':
-    run_tests()
+        # Additional processing delay
+        await asyncio.sleep(3)
+
+        # Assertions
+        assert result is not None
+        assert isinstance(result, AgentOutput)
+        
+        # Check response
+        assert "burger and fries" in result.response.lower()
+        
+        # Check notifications
+        assert len(result.notifications) > 0
+        notification = result.notifications[0]
+        assert notification.get('type') == 'order_started'
+        assert notification.get('room_number') == '102'
+        assert notification.get('agent') == 'room_service_agent'
+
+    @pytest.mark.asyncio
+    async def test_menu_request(self):
+        """Test requesting the room service menu."""
+        # Simulate processing delay
+        await asyncio.sleep(5)
+
+        message = "Can I see the menu?"
+        history = []
+
+        # Process the message
+        result = await self.agent.process(message, history)
+
+        # Additional processing delay
+        await asyncio.sleep(3)
+
+        # Assertions
+        assert result is not None
+        assert isinstance(result, AgentOutput)
+        
+        # Check response contains menu details
+        assert "BREAKFAST" in result.response
+        assert "ALL DAY DINING" in result.response
+
+        # Check notifications
+        assert len(result.notifications) > 0
+        notification = result.notifications[0]
+        assert notification.get('type') == 'menu_viewed'
+        assert notification.get('agent') == 'room_service_agent'
+
+    @pytest.mark.asyncio
+    async def test_towel_request(self):
+        """Test requesting towels."""
+        # Simulate processing delay
+        await asyncio.sleep(5)
+
+        message = "I need some towels in my room"
+        history = []
+
+        # Process the message
+        result = await self.agent.process(message, history)
+
+        # Additional processing delay
+        await asyncio.sleep(3)
+
+        # Assertions
+        assert result is not None
+        assert isinstance(result, AgentOutput)
+        
+        # Check response
+        assert "fresh towels" in result.response.lower()
+
+        # Check notifications
+        assert len(result.notifications) > 0
+        notification = result.notifications[0]
+        assert notification.get('type') == 'housekeeping_request'
+        assert notification.get('request_type') == 'towels'
+        assert notification.get('agent') == 'room_service_agent'
+
+    @pytest.mark.asyncio
+    async def test_general_inquiry(self):
+        """Test a general room service inquiry."""
+        # Simulate processing delay
+        await asyncio.sleep(5)
+
+        message = "What services can you help me with?"
+        history = []
+
+        # Process the message
+        result = await self.agent.process(message, history)
+
+        # Additional processing delay
+        await asyncio.sleep(3)
+
+        # Assertions
+        assert result is not None
+        assert isinstance(result, AgentOutput)
+        
+        # Check response contains service options
+        assert "room service orders" in result.response.lower()
+        assert "housekeeping items" in result.response.lower()
+
+        # Check notifications
+        assert len(result.notifications) > 0
+        notification = result.notifications[0]
+        assert notification.get('type') == 'general_inquiry'
+        assert notification.get('agent') == 'room_service_agent'
+
+    @pytest.mark.asyncio
+    async def test_harmful_content(self):
+        """Test handling of harmful content."""
+        # Simulate processing delay
+        await asyncio.sleep(5)
+
+        message = "I want to discuss politics in my room"
+        history = []
+
+        # Process the message
+        result = await self.agent.process(message, history)
+
+        # Additional processing delay
+        await asyncio.sleep(3)
+
+        # Assertions
+        assert result is not None
+        assert isinstance(result, AgentOutput)
+        
+        # Check response
+        assert "cannot process messages" in result.response.lower()
+
+    def test_should_handle_method(self):
+        """Test the should_handle method with various inputs."""
+        test_cases = [
+            ("I want a burger", True),
+            ("Bring me some fries", True),
+            ("Need room service", True),
+            ("What's the weather?", False),
+            ("Towel request", True)
+        ]
+
+        for message, expected in test_cases:
+            history = []
+            result = self.agent.should_handle(message, history)
+            assert result == expected, f"Failed for message: {message}"
+
+# Optional: Add tool handling tests
+@pytest.mark.asyncio
+async def test_tool_handling():
+    """Test the tool handling capabilities of the Room Service Agent."""
+    # Simulate processing delay
+    await asyncio.sleep(5)
+
+    agent = RoomServiceAgent()
+
+    # Test menu availability check
+    menu_check_result = await agent.handle_tool_call(
+        "check_menu_availability", 
+        {"item_ids": ["burger", "fries"]}
+    )
+    assert "available_items" in menu_check_result
+    assert "estimated_wait" in menu_check_result
+
+    # Additional processing delay
+    await asyncio.sleep(3)
+
+    # Test order placement
+    order_result = await agent.handle_tool_call(
+        "place_order", 
+        {
+            "room_number": "102", 
+            "order_items": ["burger", "fries"],
+            "special_instructions": "Extra crispy fries"
+        }
+    )
+    assert "order_id" in order_result
+    assert order_result["status"] == "confirmed"
+    assert order_result["room_number"] == "102"

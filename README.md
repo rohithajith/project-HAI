@@ -1,79 +1,97 @@
-# Hotel AI System with FastAPI and Flask
+# Hotel AI System with Local LLM and Flask
 
-This project implements a hotel AI system with a chatbot interface that connects to AI agents for handling various guest requests. The system uses FastAPI for WebSocket communication and separate Flask applications for each frontend page.
+This project implements a hotel AI system with a chatbot interface that connects to AI agents for handling various guest requests. The system uses Flask with Socket.IO for real-time communication and local LLM integration for processing requests.
 
 ## Features
 
 - Guest chatbot interface for making requests
 - Room service dashboard for handling food and drink orders
 - Admin dashboard for maintenance requests and bookings
-- AI agents that process guest requests and send notifications to the appropriate dashboards
-- Real-time updates using WebSockets
+- AI agents that process guest requests using local LLM
+- Real-time updates using Socket.IO
+- Local model processing without external API calls
 
 ## Architecture
 
 - **Backend**:
-  - FastAPI server for WebSocket communication and API endpoints
-  - Python-based AI agents for processing guest requests
+  - Flask server with Socket.IO for real-time communication
+  - Python-based AI agents using local LLM for processing guest requests
+  - LangGraph for agent orchestration
+  - Pydantic for schema validation
 
 - **Frontend**:
-  - Three separate Flask applications:
-    - Guest App: For guests to interact with the chatbot
-    - Admin App: For admin notifications (maintenance, bookings)
-    - Room Service App: For room service team notifications (food, drinks)
-  - Each app has its own flask landing page
-  - WebSocket connections for real-time updates if integratable 
+  - Unified Flask application serving three interfaces:
+    - Guest Chatbot: For guests to interact with the AI
+    - Admin Dashboard: For admin notifications
+    - Room Service Dashboard: For room service team notifications
+  - Real-time WebSocket communication using Socket.IO
+  - Responsive UI with status management
+
+## Recent Changes
+
+### Frontend Changes
+- `backend/templates/base.html`: Updated base template with unified styling
+- `backend/templates/index.html`: Enhanced guest chatbot with room validation
+- `backend/templates/admin.html`: Added real-time notification system
+- `backend/templates/room_service.html`: Added request management system
+
+### Backend Changes
+- `backend/flask_app.py`: 
+  - Implemented Socket.IO namespaces for different interfaces
+  - Added proper error handling
+  - Integrated with agent manager for local LLM processing
+
+### Agent System Changes
+- `backend/ai_agents/agent_manager_corrected.py`: Enhanced for local model usage
+- `backend/ai_agents/supervisor_agent.py`: Added LangGraph workflow support
 
 ## Setup and Installation
 
-1. Access the applications:
-   - Guest Chatbot: http://localhost:5001/
-   - Admin Dashboard: http://localhost:5002/
-   - Room Service Dashboard: http://localhost:5003/
+1. Ensure you have the local model in `finetunedmodel-merged` directory
+2. Install requirements: `pip install -r requirements.txt`
+3. Run the Flask server: `python backend/flask_app.py`
+4. Access the interfaces:
+   - Guest Chatbot: http://localhost:5000/
+   - Admin Dashboard: http://localhost:5000/admin
+   - Room Service Dashboard: http://localhost:5000/room-service
 
-## Testing the System flow
+## Testing the System Flow
 
-1. Open the Guest Chatbot page and enter your room number (e.g., 101).
-2. Send a message like "I'd like to order a burger and fries" - this should trigger the Room Service Agent.
-3. Check the Room Service Dashboard to see the notification for the food order.
-4. Go back to the Guest Chatbot and send a message like "The sink in my bathroom is leaking" - this should trigger the Maintenance Agent.
-5. Check the Admin Dashboard to see the notification for the maintenance request.
+1. Open the Guest Chatbot page and enter your room number (e.g., 101)
+2. Send a message like "I need extra towels" or "Can I order room service?"
+3. The request will be processed by the local LLM through the agent system
+4. Check the appropriate dashboard (Room Service or Admin) to see the notification
+5. Use the dashboard controls to manage request status (Start Preparing, Mark Delivered)
 
-## Docker Container Structure
+## WebSocket Namespaces
 
-- **backend**: Contains the FastAPI server and AI agents
-- **guest-app**: Contains the Flask application for the guest chatbot
-- **admin-app**: Contains the Flask application for the admin dashboard
-- **room-service-app**: Contains the Flask application for the room service dashboard
-
-## WebSocket Endpoints
-
-- `/ws/guest`: For guest chatbot communication
-- `/ws/admin`: For admin dashboard notifications
-- `/ws/room-service`: For room service dashboard notifications
-
-## HTTP Endpoints
-
-- `/api/message`: For sending messages via HTTP (alternative to WebSocket)
-- `/health`: For checking the health of the system
-- `/`: Root endpoint
+- `/guest`: For guest chatbot communication
+- `/admin`: For admin dashboard notifications
+- `/room-service`: For room service dashboard notifications
 
 ## Development
 
 To modify or extend the system:
 
 1. AI Agents: Edit files in the `backend/ai_agents` directory
-2. Frontend: Edit templates in the respective app's `templates` directory
-3. Backend: Edit `fastapi_server.py` as needed
+2. Frontend: Edit templates in `backend/templates` directory
+3. Backend: Edit `backend/flask_app.py` as needed
 
 ## Troubleshooting
 
-- If the WebSocket connection fails, check that the backend server is running
-- If agents aren't responding, check the console logs for errors
+- If the Socket.IO connection fails, check that the Flask server is running
+- If agents aren't responding, check that the local model is properly loaded
 - Make sure all dependencies are installed correctly
-- If using Docker, check the container logs for any errors:
-  ```
-  docker-compose logs backend
-  docker-compose logs guest-app
-  docker-compose logs admin-app
-  docker-compose logs room-service-app
+- Check the console logs for detailed error messages
+- Verify the local model path in `agent_manager_corrected.py`
+
+## Local Model Integration
+
+The system uses a local LLM model for processing requests:
+- Model Location: `finetunedmodel-merged`
+- Loading: Handled by `local_model_chatbot.py`
+- Features:
+  - 8-bit quantization
+  - Automatic device mapping
+  - Thread-safe loading
+  - Caching mechanism

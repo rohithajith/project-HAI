@@ -59,18 +59,36 @@ def load_model_and_tokenizer():
     
     logger.info("Loading LLM model and tokenizer for fallback...")
     try:
-        model_path = "finetunedmodel-merged"
+        model_path = "C:/Users/2312205/Downloads/project-HAI/finetunedmodel-merged"
         logger.info(f"Loading model from: {model_path}")
 
-        _tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
-        _model = AutoModelForCausalLM.from_pretrained(
-            model_path,
-            trust_remote_code=True,
-            load_in_8bit=True,  # Enable bitsandbytes quantization if needed
-            device_map="auto"  # Automatically selects CUDA if available
-        )
-
-        logger.info("✅ Model loaded successfully!")
+        try:
+            _tokenizer = AutoTokenizer.from_pretrained(
+                model_path,
+                trust_remote_code=True,
+                padding_side="left"  # Ensure consistent padding for chat
+            )
+            
+            # Ensure tokenizer has necessary special tokens
+            if _tokenizer.pad_token is None:
+                _tokenizer.pad_token = _tokenizer.eos_token
+                
+            _model = AutoModelForCausalLM.from_pretrained(
+                model_path,
+                trust_remote_code=True,
+                load_in_8bit=True,  # Enable bitsandbytes quantization
+                device_map="auto",  # Automatically selects CUDA if available
+                torch_dtype=torch.float16  # Use fp16 for efficiency
+            )
+            
+            # Move model to appropriate device
+            _device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            logger.info(f"Using device: {_device}")
+            
+            logger.info("✅ Model loaded successfully!")
+        except Exception as e:
+            logger.error(f"Error loading tokenizer or model: {e}")
+            raise
         _device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         _model_loaded = True
         _model_loading = False

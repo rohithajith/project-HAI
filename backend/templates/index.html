@@ -2,6 +2,10 @@
 
 {% block title %}Guest Chatbot - Hotel AI{% endblock %}
 
+{% block head %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+{% endblock %}
+
 {% block styles %}
 .chatbox {
     height: 400px;
@@ -54,6 +58,12 @@
 .room-input {
     margin-bottom: 20px;
 }
+
+.error-message {
+    color: #ff0000;
+    margin-top: 5px;
+    display: none;
+}
 {% endblock %}
 
 {% block content %}
@@ -62,6 +72,7 @@
     <div class="room-input">
         <label for="room-number">Your Room Number:</label>
         <input type="text" id="room-number" placeholder="Enter your room number">
+        <div id="room-error" class="error-message">Please enter a valid room number</div>
     </div>
     
     <div class="chatbox" id="chatbox">
@@ -90,29 +101,24 @@
         const messageInput = document.getElementById('message-input');
         const sendButton = document.getElementById('send-button');
         const roomNumberInput = document.getElementById('room-number');
+        const roomError = document.getElementById('room-error');
         
         let socket = null;
         let messageHistory = [];
         
-        // Connect to WebSocket
-        function connectWebSocket() {
-            // Close existing socket if any
-            if (socket) {
-                socket.close();
-            }
+        // Connect to Socket.IO
+        function connectSocket() {
+            // Create new Socket.IO connection with guest namespace
+            socket = io('/guest');
             
-            // Create new WebSocket connection
-            socket = new WebSocket('ws://localhost:8000/ws/guest');
-            
-            socket.onopen = function(event) {
-                console.log('WebSocket connection established');
+            socket.on('connect', function() {
+                console.log('Socket.IO connection established');
                 addMessage('Connected to server.', 'bot');
-            };
+            });
             
-            socket.onmessage = function(event) {
-                console.log('Message from server:', event.data);
+            socket.on('message', function(data) {
+                console.log('Message from server:', data);
                 try {
-                    const data = JSON.parse(event.data);
                     if (data.type === 'notification') {
                         addMessage(`Notification: ${JSON.stringify(data.payload)}`, 'agent-action');
                     } else if (data.response) {
@@ -126,21 +132,19 @@
                         addMessage(JSON.stringify(data), 'bot');
                     }
                 } catch (e) {
-                    addMessage(event.data, 'bot');
+                    addMessage(data, 'bot');
                 }
-            };
+            });
             
-            socket.onerror = function(error) {
-                console.error('WebSocket error:', error);
-                addMessage('WebSocket error. Check console.', 'bot');
-            };
-            
-            socket.onclose = function(event) {
-                console.log('WebSocket connection closed');
+            socket.on('disconnect', function() {
+                console.log('Socket.IO connection closed');
                 addMessage('Connection closed. Attempting to reconnect...', 'bot');
-                // Try to reconnect after 5 seconds
-                setTimeout(connectWebSocket, 5000);
-            };
+            });
+            
+            socket.on('connect_error', function(error) {
+                console.error('Socket.IO connection error:', error);
+                addMessage('Connection error. Please try again.', 'bot');
+            });
         }
         
         // Add message to chatbox
@@ -154,10 +158,22 @@
             chatbox.scrollTop = chatbox.scrollHeight;
         }
         
+        // Validate room number
+        function validateRoomNumber(roomNumber) {
+            // Basic validation: must be a number between 100 and 999
+            const isValid = /^[1-9]\d{2}$/.test(roomNumber);
+            roomError.style.display = isValid ? 'none' : 'block';
+            return isValid;
+        }
+        
         // Send message
         function sendMessage() {
             const messageText = messageInput.value.trim();
             const roomNumber = roomNumberInput.value.trim();
+            
+            if (!validateRoomNumber(roomNumber)) {
+                return;
+            }
             
             if (messageText) {
                 // Add user message to chat
@@ -178,14 +194,15 @@
                 });
                 
                 // Send to server if connected
-                if (socket && socket.readyState === WebSocket.OPEN) {
-                    socket.send(JSON.stringify({
+                if (socket && socket.connected) {
+                    socket.emit('message', {
                         message: messageToSend,
-                        history: messageHistory
-                    }));
+                        history: messageHistory,
+                        room: roomNumber
+                    });
                 } else {
                     addMessage('Not connected to server. Trying to reconnect...', 'bot');
-                    connectWebSocket();
+                    connectSocket();
                 }
                 
                 // Clear input
@@ -202,8 +219,12 @@
             }
         });
         
+        roomNumberInput.addEventListener('input', function() {
+            validateRoomNumber(this.value.trim());
+        });
+        
         // Initial connection
-        connectWebSocket();
+        connectSocket();
     });
 </script>
 {% endblock %}
