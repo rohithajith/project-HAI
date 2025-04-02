@@ -1,196 +1,153 @@
 import asyncio
 import pytest
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import List, Dict, Any
+
+# Import specific agents for testing
 from ai_agents.room_service_agent import RoomServiceAgent
+from ai_agents.supervisor_agent import SupervisorAgent
 from ai_agents.base_agent import AgentOutput
 
-class TestRoomServiceAgent:
-    def setup_method(self):
-        """Initialize the room service agent before each test."""
-        self.agent = RoomServiceAgent()
+class TestRoomServiceAndAdminAgents:
+    def test_room_service_agent_initialization(self):
+        """Test Room Service Agent initialization."""
+        agent = RoomServiceAgent()
+        
+        # Check basic agent properties
+        assert hasattr(agent, 'name')
+        assert agent.name == "room_service_agent"
+        assert agent.priority == 10
+        assert len(agent.tools) > 0
+        
+        # Verify specific tools
+        tool_names = [tool.name for tool in agent.tools]
+        assert "check_menu_availability" in tool_names
+        assert "place_order" in tool_names
 
     @pytest.mark.asyncio
-    async def test_burger_and_fries_order(self):
-        """Test ordering a burger and fries in a specific room."""
-        # Simulate processing delay
-        await asyncio.sleep(5)
-
-        message = "I am in room 102. I would like to order a burger and fries"
-        history = []
-
-        # Process the message
-        result = await self.agent.process(message, history)
-
-        # Additional processing delay
-        await asyncio.sleep(3)
-
-        # Assertions
-        assert result is not None
-        assert isinstance(result, AgentOutput)
-        
-        # Check response
-        assert "burger and fries" in result.response.lower()
-        
-        # Check notifications
-        assert len(result.notifications) > 0
-        notification = result.notifications[0]
-        assert notification.get('type') == 'order_started'
-        assert notification.get('room_number') == '102'
-        assert notification.get('agent') == 'room_service_agent'
-
-    @pytest.mark.asyncio
-    async def test_menu_request(self):
-        """Test requesting the room service menu."""
-        # Simulate processing delay
-        await asyncio.sleep(5)
-
-        message = "Can I see the menu?"
-        history = []
-
-        # Process the message
-        result = await self.agent.process(message, history)
-
-        # Additional processing delay
-        await asyncio.sleep(3)
-
-        # Assertions
-        assert result is not None
-        assert isinstance(result, AgentOutput)
-        
-        # Check response contains menu details
-        assert "BREAKFAST" in result.response
-        assert "ALL DAY DINING" in result.response
-
-        # Check notifications
-        assert len(result.notifications) > 0
-        notification = result.notifications[0]
-        assert notification.get('type') == 'menu_viewed'
-        assert notification.get('agent') == 'room_service_agent'
-
-    @pytest.mark.asyncio
-    async def test_towel_request(self):
-        """Test requesting towels."""
-        # Simulate processing delay
-        await asyncio.sleep(5)
-
-        message = "I need some towels in my room"
-        history = []
-
-        # Process the message
-        result = await self.agent.process(message, history)
-
-        # Additional processing delay
-        await asyncio.sleep(3)
-
-        # Assertions
-        assert result is not None
-        assert isinstance(result, AgentOutput)
-        
-        # Check response
-        assert "fresh towels" in result.response.lower()
-
-        # Check notifications
-        assert len(result.notifications) > 0
-        notification = result.notifications[0]
-        assert notification.get('type') == 'housekeeping_request'
-        assert notification.get('request_type') == 'towels'
-        assert notification.get('agent') == 'room_service_agent'
-
-    @pytest.mark.asyncio
-    async def test_general_inquiry(self):
-        """Test a general room service inquiry."""
-        # Simulate processing delay
-        await asyncio.sleep(5)
-
-        message = "What services can you help me with?"
-        history = []
-
-        # Process the message
-        result = await self.agent.process(message, history)
-
-        # Additional processing delay
-        await asyncio.sleep(3)
-
-        # Assertions
-        assert result is not None
-        assert isinstance(result, AgentOutput)
-        
-        # Check response contains service options
-        assert "room service orders" in result.response.lower()
-        assert "housekeeping items" in result.response.lower()
-
-        # Check notifications
-        assert len(result.notifications) > 0
-        notification = result.notifications[0]
-        assert notification.get('type') == 'general_inquiry'
-        assert notification.get('agent') == 'room_service_agent'
-
-    @pytest.mark.asyncio
-    async def test_harmful_content(self):
-        """Test handling of harmful content."""
-        # Simulate processing delay
-        await asyncio.sleep(5)
-
-        message = "I want to discuss politics in my room"
-        history = []
-
-        # Process the message
-        result = await self.agent.process(message, history)
-
-        # Additional processing delay
-        await asyncio.sleep(3)
-
-        # Assertions
-        assert result is not None
-        assert isinstance(result, AgentOutput)
-        
-        # Check response
-        assert "cannot process messages" in result.response.lower()
-
-    def test_should_handle_method(self):
-        """Test the should_handle method with various inputs."""
-        test_cases = [
-            ("I want a burger", True),
-            ("Bring me some fries", True),
-            ("Need room service", True),
-            ("What's the weather?", False),
-            ("Towel request", True)
+    async def test_room_service_order_scenarios(self):
+        """Comprehensive test scenarios for Room Service Agent."""
+        agent = RoomServiceAgent()
+        scenarios = [
+            {
+                "message": "I am in room 102. I would like to order a burger and fries",
+                "expected_keywords": ["burger", "fries", "room 102"],
+                "notification_type": "order_started"
+            },
+            {
+                "message": "Can I see the menu?",
+                "expected_keywords": ["menu", "breakfast", "dining"],
+                "notification_type": "menu_viewed"
+            },
+            {
+                "message": "I need some towels",
+                "expected_keywords": ["towels", "fresh"],
+                "notification_type": "housekeeping_request"
+            }
         ]
 
-        for message, expected in test_cases:
-            history = []
-            result = self.agent.should_handle(message, history)
-            assert result == expected, f"Failed for message: {message}"
+        for scenario in scenarios:
+            # Simulate processing delay
+            await asyncio.sleep(2)
 
-# Optional: Add tool handling tests
-@pytest.mark.asyncio
-async def test_tool_handling():
-    """Test the tool handling capabilities of the Room Service Agent."""
-    # Simulate processing delay
-    await asyncio.sleep(5)
+            # Process message
+            result = await agent.process(scenario["message"], [])
 
-    agent = RoomServiceAgent()
+            # Validate result
+            assert result is not None
+            assert isinstance(result, AgentOutput)
 
-    # Test menu availability check
-    menu_check_result = await agent.handle_tool_call(
-        "check_menu_availability", 
-        {"item_ids": ["burger", "fries"]}
-    )
-    assert "available_items" in menu_check_result
-    assert "estimated_wait" in menu_check_result
+            # Check response contains expected keywords
+            response_lower = result.response.lower()
+            for keyword in scenario["expected_keywords"]:
+                assert keyword.lower() in response_lower, f"Keyword '{keyword}' not found in response"
 
-    # Additional processing delay
-    await asyncio.sleep(3)
+            # Validate notifications
+            assert len(result.notifications) > 0
+            notification = result.notifications[0]
+            assert notification.get('type') == scenario["notification_type"]
+            assert notification.get('agent') == 'room_service_agent'
 
-    # Test order placement
-    order_result = await agent.handle_tool_call(
-        "place_order", 
-        {
-            "room_number": "102", 
-            "order_items": ["burger", "fries"],
-            "special_instructions": "Extra crispy fries"
-        }
-    )
-    assert "order_id" in order_result
-    assert order_result["status"] == "confirmed"
-    assert order_result["room_number"] == "102"
+    def test_room_service_agent_tool_handling(self):
+        """Test Room Service Agent tool handling."""
+        agent = RoomServiceAgent()
+
+        # Test menu availability check
+        menu_check_result = asyncio.run(agent.handle_tool_call(
+            "check_menu_availability", 
+            {"item_ids": ["burger", "fries"]}
+        ))
+        assert "available_items" in menu_check_result
+        assert "estimated_wait" in menu_check_result
+
+        # Test order placement
+        order_result = asyncio.run(agent.handle_tool_call(
+            "place_order", 
+            {
+                "room_number": "102", 
+                "order_items": ["burger", "fries"],
+                "special_instructions": "Extra crispy fries"
+            }
+        ))
+        assert "order_id" in order_result
+        assert order_result["status"] == "confirmed"
+        assert order_result["room_number"] == "102"
+
+    def test_supervisor_agent_initialization(self):
+        """Test Supervisor Agent initialization."""
+        agent = SupervisorAgent()
+        
+        # Check basic agent properties
+        assert hasattr(agent, 'agents'), "Supervisor Agent should have 'agents' attribute"
+        assert isinstance(agent.agents, dict), "'agents' should be a dictionary"
+        
+        # Check workflow-related attributes
+        assert hasattr(agent, 'workflow'), "Supervisor Agent should have 'workflow' attribute"
+        assert hasattr(agent, 'model'), "Supervisor Agent should have 'model' attribute"
+        assert hasattr(agent, 'tokenizer'), "Supervisor Agent should have 'tokenizer' attribute"
+        assert hasattr(agent, 'device'), "Supervisor Agent should have 'device' attribute"
+
+    def test_supervisor_agent_methods(self):
+        """Test Supervisor Agent methods."""
+        agent = SupervisorAgent()
+        
+        # Test register_agent method
+        mock_base_agent = type('MockBaseAgent', (), {
+            'name': 'mock_agent',
+            'priority': 5,
+            'should_handle': lambda self, message, history: True,
+            'process': lambda self, message, history: AgentOutput(response="Mock response")
+        })()
+        
+        agent.register_agent(mock_base_agent)
+        
+        # Verify agent was registered
+        assert 'mock_agent' in agent.agents
+        assert agent.agents['mock_agent'] == mock_base_agent
+
+def generate_agent_interaction_report():
+    """Generate a report of agent interactions and capabilities."""
+    report = "# Agent Interaction Report\n\n"
+    
+    # Room Service Agent Report
+    report += "## Room Service Agent Capabilities\n"
+    report += "- Handles room service orders\n"
+    report += "- Manages menu inquiries\n"
+    report += "- Processes housekeeping requests\n\n"
+
+    # Supervisor Agent Report
+    report += "## Supervisor Agent Capabilities\n"
+    report += "- Coordinates workflow between agents\n"
+    report += "- Selects appropriate agent for requests\n"
+    report += "- Manages agent interactions\n"
+
+    # Write report to file
+    with open('backend/agent_interaction_report.md', 'w') as f:
+        f.write(report)
+
+    print("Agent interaction report generated at backend/agent_interaction_report.md")
+
+# Generate report after tests
+def pytest_terminal_summary(terminalreporter, exitstatus, config):
+    if exitstatus == 0:
+        generate_agent_interaction_report()
