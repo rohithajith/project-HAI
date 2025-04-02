@@ -53,11 +53,7 @@
   - Request deletion of their data
 - Implement verification mechanisms to ensure only authorized users can access data
 
-## 2. PostgreSQL Migration Plan
-
-### 2.1 Database Configuration Changes
-
-#### 2.1.1 PostgreSQL Setup
+#### 2.1.1 PostgreSQL Setup for data collected 
 - Install PostgreSQL and required dependencies
 - Configure connection pooling for optimal performance
 - Set up proper authentication and security
@@ -233,11 +229,9 @@ CREATE INDEX idx_llm_metrics_message_id ON llm_metrics(message_id);
 5. Validate data integrity
 6. Update application to use PostgreSQL
 
-## 3. LLM Conversation History Storage Implementation
+## 3. LLM Conversation History Storage Implementation 
 
-### 3.1 Modifications to Chatbot Controller
-
-#### 3.1.1 Update `chatbotController.js`
+#### 3.1.1 
 - Add user authentication check
 - Check and store user consent
 - Create conversation session if not exists
@@ -282,14 +276,6 @@ CREATE INDEX idx_llm_metrics_message_id ON llm_metrics(message_id);
    - Keep anonymized data for longer periods
    - Implement complete deletion on user request
 
-### 3.4 Modifications to Python LLM Script
-
-#### 3.4.1 Update `local_model_chatbot.py`
-- Add metrics collection (tokens, latency)
-- Implement memory management for conversation context
-- Add capability to return model metadata
-- Implement PII detection in responses
-
 ## 4. Implementation Roadmap
 
 ### Phase 1: Database Migration (Week 1)
@@ -299,7 +285,7 @@ CREATE INDEX idx_llm_metrics_message_id ON llm_metrics(message_id);
 - Test database connection
 
 ### Phase 2: Ethical Data Collection Framework (Week 2)
-- Implement consent management
+- Implement consent management *but try not pop everytime 
 - Create privacy notices
 - Develop user data access endpoints
 - Test consent flow
@@ -311,16 +297,10 @@ CREATE INDEX idx_llm_metrics_message_id ON llm_metrics(message_id);
 - Test conversation storage
 
 ### Phase 4: LLM Enhancements (Week 4)
-- Update Python LLM script
+- Update Python LLM script if done , not required 
 - Add metrics collection
 - Implement PII detection
 - Test end-to-end flow
-
-### Phase 5: Analytics and Reporting (Week 5)
-- Create analytics dashboard
-- Implement reporting functionality
-- Set up data retention jobs
-- Final testing and deployment
 
 ## 5. Security and Compliance Considerations
 
