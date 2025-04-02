@@ -21,77 +21,17 @@ This project implements a hotel AI system with a chatbot interface that connects
     - Guest App: For guests to interact with the chatbot
     - Admin App: For admin notifications (maintenance, bookings)
     - Room Service App: For room service team notifications (food, drinks)
-  - Each app has its own HTML/CSS/JavaScript interface
-  - WebSocket connections for real-time updates
+  - Each app has its own flask landing page
+  - WebSocket connections for real-time updates if integratable 
 
 ## Setup and Installation
 
-### Using Docker (Recommended)
-
-1. Make sure you have Docker and Docker Compose installed on your system.
-
-2. Clone the repository:
-   ```
-   git clone <repository-url>
-   cd project-HAI
-   ```
-
-3. Build and start the containers:
-   ```
-   docker-compose up --build
-   ```
-
-4. Access the applications:
+1. Access the applications:
    - Guest Chatbot: http://localhost:5001/
    - Admin Dashboard: http://localhost:5002/
    - Room Service Dashboard: http://localhost:5003/
 
-### Manual Setup
-
-1. Clone the repository:
-   ```
-   git clone <repository-url>
-   cd project-HAI
-   ```
-
-2. Install backend dependencies:
-   ```
-   cd backend
-   pip install -r requirements.txt
-   ```
-
-3. Install frontend dependencies:
-   ```
-   pip install flask flask-cors requests
-   ```
-
-4. Start the backend server:
-   ```
-   cd backend
-   uvicorn fastapi_server:app --host 0.0.0.0 --port 8000
-   ```
-
-5. Start the frontend applications (in separate terminals):
-   ```
-   # Guest App
-   cd frontend/guest-app
-   flask run --host=0.0.0.0 --port=5001
-
-   # Admin App
-   cd frontend/admin-app
-   flask run --host=0.0.0.0 --port=5002
-
-   # Room Service App
-   cd frontend/room-service-app
-   flask run --host=0.0.0.0 --port=5003
-   ```
-
-6. Access the applications:
-   - Guest Chatbot: http://localhost:5001/
-   - Admin Dashboard: http://localhost:5002/
-   - Room Service Dashboard: http://localhost:5003/
-
-## Testing the System
+## Testing the System flow
 
 1. Open the Guest Chatbot page and enter your room number (e.g., 101).
 2. Send a message like "I'd like to order a burger and fries" - this should trigger the Room Service Agent.
