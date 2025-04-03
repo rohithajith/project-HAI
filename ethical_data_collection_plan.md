@@ -18,6 +18,7 @@
 - Store user consent preferences in the database
 - Allow users to update their consent preferences at any time
 - Implement different levels of consent (e.g., storage for service improvement, training, etc.)
+- TODO: Implement API endpoints for updating and logging user consent changes to maintain a consent log history for GDPR compliance.
 
 #### 1.2.2 Privacy Notices
 - Create clear privacy notices explaining:
@@ -45,6 +46,9 @@
   - Tokenization
   - Pseudonymization
   - Generalization
+- TODO: Clearly define PII removal techniques such as hashing, replacing with tokens, and generalization for all stored data.
+- TODO: Implement real-time PII detection using regex and Named Entity Recognition (NER) models before data storage.
+- TODO: Ensure data anonymization occurs before storage if data will be used for training.
 
 #### 1.2.5 User Data Access and Deletion
 - Create API endpoints for users to:
@@ -52,6 +56,8 @@
   - Export their data in a portable format
   - Request deletion of their data
 - Implement verification mechanisms to ensure only authorized users can access data
+- TODO: Implement API endpoints for users to request access, deletion, and modification of their stored data.
+- TODO: Log all user requests for data access, deletion, and modification to comply with GDPR documentation requirements.
 
 #### 2.1.1 PostgreSQL Setup for data collected 
 - Install PostgreSQL and required dependencies
@@ -162,6 +168,32 @@ CREATE TABLE audit_logs (
     ip_address VARCHAR(50),
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Updated Data consent table
+CREATE TABLE data_consent (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    service_improvement BOOLEAN DEFAULT FALSE,
+    model_training BOOLEAN DEFAULT FALSE,
+    analytics BOOLEAN DEFAULT FALSE,
+    marketing BOOLEAN DEFAULT FALSE,
+    personalization BOOLEAN DEFAULT FALSE,  -- TODO: Add this to differentiate consent types more clearly
+    consent_given_at TIMESTAMP WITH TIME ZONE,
+    last_updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+- TODO: Add a consent log table to track all changes in user consent for GDPR compliance.
+
+```sql
+-- Consent log table
+CREATE TABLE consent_log (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    consent_type VARCHAR(100),
+    consent_value BOOLEAN,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
 ```
 
 #### 2.2.2 Conversation History Tables
@@ -239,25 +271,54 @@ CREATE INDEX idx_llm_metrics_message_id ON llm_metrics(message_id);
 - Collect and store LLM metrics
 - Implement anonymization for stored conversations
 
-### 3.2 Conversation Storage Flow
+### 3.2 Conversation Storage Flow (Improved)
 
 ```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  User sends │     │ Check user  │     │ Create/get  │
-│   message   │────▶│   consent   │────▶│ conversation│
-└─────────────┘     └─────────────┘     │   session   │
-                                        └──────┬──────┘
-                                               │
-┌─────────────┐     ┌─────────────┐     ┌─────▼──────┐
-│  Store LLM  │     │ Process LLM │     │ Store user │
-│   metrics   │◀────│  response   │◀────│  message   │
-└─────────────┘     └─────────────┘     └─────────────┘
-       │                   │
-       │             ┌─────▼──────┐
-       └────────────▶│ Store LLM  │
-                     │  response  │
-                     └─────────────┘
+              ┌─────────────┐
+              │  User sends │
+              │   message   │
+              └───────┬─────┘
+                      │
+                      ▼
+             ┌────────────────┐
+             │ Check User     │
+             │ Consent Status │───▶ [Reject if No Consent]
+             └───────┬─────────┘
+                     │
+                     ▼
+            ┌───────────────────┐
+            │ Create/Get        │
+            │ Conversation      │
+            │ Session (Async)   │
+            └───────┬───────────┘
+                    │
+                    ▼
+           ┌─────────────────────┐
+           │ Process LLM Request │
+           │ (Generate Response) │
+           └───────┬─────────────┘
+                   │
+                   ▼
+          ┌─────────────────────┐
+          │ Store LLM Response  │
+          │ & Conversation Msg  │
+          └────────────┬────────┘
+                       │
+             ┌─────────▼───────────┐
+             │ Async LLM Metric    │
+             │ Collection & Storage│
+             └─────────┬───────────┘
+                       │
+             ┌─────────▼───────────┐
+             │ Logging & Error     │
+             │ Handling (Async)    │
+             └─────────────────────┘
 ```
+
+- TODO: Implement the improved conversation storage flow with asynchronous handling for session management, metric collection, and logging.
+- TODO: Implement proper error handling and logging mechanisms to capture failures or errors during the conversation flow.
+- TODO: Verify user consent status at the start of the conversation to prevent processing unauthorized data.
+- TODO: Use asynchronous frameworks (e.g., Celery or asyncio) to improve efficiency and scalability of the conversation flow.
 
 ### 3.3 Anonymization Process
 
@@ -309,12 +370,15 @@ CREATE INDEX idx_llm_metrics_message_id ON llm_metrics(message_id);
 - Implement proper access controls
 - Use parameterized queries to prevent SQL injection
 - Regularly audit access to conversation data
+- TODO: Implement AES-256 encryption for sensitive data at rest in the PostgreSQL database.
+- TODO: Ensure HTTPS is used for all client-server communications.
 
 ### 5.2 Compliance Requirements
 - GDPR compliance for EU users
 - CCPA compliance for California users
 - HIPAA compliance if handling health information
 - Industry-specific regulations
+- TODO: Create a Data Protection Impact Assessment (DPIA) document to ensure GDPR compliance.
 
 ### 5.3 Documentation Requirements
 - Data Processing Impact Assessment

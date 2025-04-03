@@ -108,6 +108,43 @@ class SupervisorAgent:
         """Register a specialized agent with the supervisor."""
         self.agents[agent.name] = agent
         
+    def build_workflow(self) -> Optional[Graph]:
+        """
+        Build a basic workflow for agent coordination.
+        This is a placeholder implementation to satisfy the method call.
+        """
+        try:
+            # Create a simple state graph
+            workflow = StateGraph(SupervisorState)
+            
+            # Add a basic routing node
+            def route_to_agent(state: SupervisorState) -> str:
+                if not state.messages:
+                    return "end"
+                
+                message = state.messages[-1]["content"]
+                history = state.messages[:-1]
+                
+                next_agent = self._select_next_agent(message, history)
+                
+                return next_agent.name if next_agent else "end"
+            
+            # Add nodes and basic routing
+            workflow.add_node("route", route_to_agent)
+            workflow.add_node("end", lambda state: state)
+            
+            # Set basic workflow structure
+            workflow.set_entry_point("route")
+            workflow.add_edge("route", "end")
+            
+            # Compile the workflow
+            self.workflow = workflow.compile()
+            return self.workflow
+        
+        except Exception as e:
+            print(f"Error building workflow: {e}")
+            return None
+        
     def _select_next_agent(self, message: str, history: List[Dict[str, Any]]) -> Optional[BaseAgent]:
         """Select the most appropriate agent to handle the current message."""
         message_lower = message.lower()
