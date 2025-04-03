@@ -16,7 +16,7 @@ notification_service = MockNotificationService() # Replace with actual import wh
 
 
 class MaintenanceAgent(BaseAgent):
-    name: str = "MaintenanceAgent"
+    name: str = "maintenance_agent"
     priority: int = 1 # Same priority as in JS
 
     tools: List[ToolDefinition] = [
@@ -45,6 +45,28 @@ class MaintenanceAgent(BaseAgent):
             )
         ),
         ToolDefinition(
+            name='report_maintenance_issue',
+            description='Report a maintenance issue in the room (alias for report_issue)',
+            parameters=ToolParameters(
+                properties={
+                    'issue_type': ToolParameterProperty(
+                        type='string',
+                        description='Type of maintenance issue',
+                        enum=['plumbing', 'electrical', 'furniture', 'appliance', 'other']
+                    ),
+                    'room_number': ToolParameterProperty(
+                        type='string',
+                        description='Room number where the issue is located'
+                    ),
+                    'description': ToolParameterProperty(
+                        type='string',
+                        description='Detailed description of the issue'
+                    )
+                },
+                required=['issue_type', 'room_number', 'description']
+            )
+        ),
+        ToolDefinition(
             name='schedule_maintenance',
             description='Schedule non-urgent maintenance',
             parameters=ToolParameters(
@@ -67,6 +89,49 @@ class MaintenanceAgent(BaseAgent):
             )
         )
     ]
+
+    async def handle_tool_call(self, tool_name: str, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Handle a tool call by executing the appropriate tool logic.
+
+        Args:
+            tool_name: Name of the tool to execute
+            inputs: Tool input parameters
+
+        Returns:
+            Tool execution results
+        """
+        # Find the tool definition
+        tool = next((t for t in self.tools if t.name == tool_name), None)
+        if not tool:
+            raise ValueError(f"Tool {tool_name} not found")
+            
+        # Validate inputs against tool parameters
+        required = tool.parameters.required or []
+        for param in required:
+            if param not in inputs:
+                raise ValueError(f"Missing required parameter: {param}")
+                
+        # Execute tool-specific logic
+        if tool_name in ['report_issue', 'report_maintenance_issue']:
+            # Standardize inputs for both tools
+            issue_type = inputs.get('issue_type', 'other')
+            room_number = inputs.get('room_number', 'unknown')
+            description = inputs.get('description', 'No description provided')
+            urgency = inputs.get('urgency', 'medium')
+            
+            # Simulate issue reporting
+            return {
+                "status": "reported",
+                "issue_type": issue_type,
+                "room_number": room_number,
+                "description": description,
+                "urgency": urgency,
+                "ticket_id": "MAINT-" + str(hash(description) % 10000)
+            }
+        
+        # Add other tool implementations as needed
+        raise NotImplementedError(f"Tool {tool_name} not implemented")
 
     def should_handle(self, message: str, history: List[Dict[str, Any]]) -> bool:
         """Check if the message relates to maintenance issues."""
@@ -216,31 +281,3 @@ class MaintenanceAgent(BaseAgent):
         if any(k in lower_message for k in ['important', 'asap', 'soon']):
             return 'high'
         return 'medium'
-
-# Example usage (for testing purposes)
-if __name__ == '__main__':
-    import asyncio
-
-    async def test():
-        agent = MaintenanceAgent()
-        history = [{'role': 'user', 'content': 'I am in room 101.'}]
-        message1 = "The sink in my bathroom is broken and leaking water everywhere!"
-        message2 = "Can I schedule someone to come clean the air filter tomorrow afternoon?"
-
-        print("Available tools:", agent.get_available_tools())
-
-        print(f"\nTesting message 1: '{message1}'")
-        if agent.should_handle(message1, history):
-            output1 = await agent.process(message1, history)
-            print("Output 1:", output1)
-        else:
-            print("Agent decided not to handle message 1.")
-
-        print(f"\nTesting message 2: '{message2}'")
-        if agent.should_handle(message2, history):
-            output2 = await agent.process(message2, history)
-            print("Output 2:", output2)
-        else:
-            print("Agent decided not to handle message 2.")
-
-    asyncio.run(test())

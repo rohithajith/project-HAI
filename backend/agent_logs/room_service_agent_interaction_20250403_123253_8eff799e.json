@@ -1,0 +1,33 @@
+{
+  "timestamp": "2025-04-03T12:32:53.669502+00:00",
+  "agent": "room_service_agent",
+  "message": "I need towels",
+  "response": {
+    "response": "I'll arrange to have fresh towels delivered to your room right away. Is there anything specific you need (bath towels, hand towels, etc.)?",
+    "notifications": [
+      {
+        "type": "towel_request",
+        "request_type": "towels",
+        "room_number": "101",
+        "timestamp": "2025-04-03T12:32:53.669502+00:00",
+        "agent": "room_service_agent"
+      }
+    ],
+    "tool_used": false,
+    "tool_name": null,
+    "tool_args": null,
+    "filter_result": null,
+    "frontend_update": {
+      "component": "room_service_dashboard",
+      "section": "housekeeping",
+      "action": "show_notification",
+      "message": "Fresh towels are being prepared for your room"
+    }
+  },
+  "frontend_update": {
+    "component": "room_service_dashboard",
+    "section": "housekeeping",
+    "action": "show_notification",
+    "message": "Fresh towels are being prepared for your room"
+  }
+}

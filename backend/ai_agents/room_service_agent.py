@@ -2,6 +2,7 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 from datetime import datetime, timezone
 from .base_agent import BaseAgent, AgentOutput, ToolDefinition, ToolParameters, ToolParameterProperty
+from .agent_logger import AgentLogger
 
 class RoomServiceOrder(BaseModel):
     """Schema for room service orders."""
@@ -90,38 +91,80 @@ class RoomServiceAgent(BaseAgent):
 
     async def process(self, message: str, history: List[Dict[str, Any]]) -> AgentOutput:
         """Process room service related requests."""
-        # Add agent info to output for test verification
-        agent_info = {
-            "agent": "room_service_agent",
-            "type": "agent_info"
-        }
-        
-        # Content filtering
-        if self._contains_harmful_content(message):
-            return AgentOutput(
-                response="I apologize, but I cannot process messages containing inappropriate "
-                        "content. How else may I assist you with room service?",
-                notifications=[agent_info]
-            )
-
         # Extract room number
         room_number = self._extract_room_number(message, history)
         
         if not room_number:
             return AgentOutput(
                 response="To help you with room service, could you please provide your room number?",
-                notifications=[agent_info]
+                notifications=[{
+                    "type": "room_number_request",
+                    "agent": "room_service_agent"
+                }]
             )
 
         # Determine the type of request
-        if self._is_menu_request(message):
-            return await self._handle_menu_request(room_number)
+        if "towel" in message.lower():
+            response = await self._handle_towel_request(room_number, message)
+        elif self._is_menu_request(message):
+            response = await self._handle_menu_request(room_number)
         elif self._is_order_request(message):
-            return await self._handle_order_request(message, room_number)
-        elif self._is_status_request(message):
-            return await self._handle_status_request(room_number)
+            response = await self._handle_order_request(message, room_number)
         else:
-            return await self._handle_general_inquiry(message, room_number)
+            response = await self._handle_general_inquiry(message, room_number)
+
+        # Log the interaction
+        log_response = response.model_dump()
+        log_response['frontend_update'] = self._determine_frontend_update(response)
+        AgentLogger.log_agent_interaction(self.name, message, log_response)
+
+        return response
+
+    def _determine_frontend_update(self, response: AgentOutput) -> Dict[str, Any]:
+        """Determine which frontend component should be updated based on the response."""
+        frontend_updates = {
+            "towel_request": {
+                "component": "room_service_dashboard",
+                "section": "housekeeping",
+                "action": "show_notification",
+                "message": "Fresh towels are being prepared for your room"
+            },
+            "order_started": {
+                "component": "room_service_dashboard",
+                "section": "current_orders",
+                "action": "add_order",
+                "message": "New order in progress"
+            },
+            "menu_viewed": {
+                "component": "room_service_dashboard",
+                "section": "menu",
+                "action": "highlight_menu"
+            }
+        }
+
+        # Check notifications for update type
+        for notification in response.notifications:
+            if notification.get('type') in frontend_updates:
+                return frontend_updates[notification['type']]
+        
+        return {
+            "component": "room_service_dashboard",
+            "action": "general_update"
+        }
+
+    async def _handle_towel_request(self, room_number: str, message: str) -> AgentOutput:
+        """Handle towel requests specifically."""
+        return AgentOutput(
+            response="I'll arrange to have fresh towels delivered to your room right away. "
+                    "Is there anything specific you need (bath towels, hand towels, etc.)?",
+            notifications=[{
+                "type": "towel_request",
+                "request_type": "towels",
+                "room_number": room_number,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "agent": "room_service_agent"
+            }]
+        )
 
     def _contains_harmful_content(self, message: str) -> bool:
         """Check for harmful or inappropriate content."""
@@ -238,28 +281,13 @@ class RoomServiceAgent(BaseAgent):
             notifications=[{
                 "type": "status_check",
                 "room_number": room_number,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "agent": "room_service_agent"
             }]
         )
 
     async def _handle_general_inquiry(self, message: str, room_number: str) -> AgentOutput:
         """Handle general room service and housekeeping inquiries."""
-        # Check for towel request
-        if "towel" in message.lower():
-            return AgentOutput(
-                response="I'll arrange to have fresh towels delivered to your room right away. "
-                        "Is there anything specific you need (bath towels, hand towels, etc.)?",
-                notifications=[{
-                    "type": "housekeeping_request",
-                    "request_type": "towels",
-                    "room_number": room_number,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "agent": "room_service_agent"
-                }]
-            )
-        
-        # Default response for other inquiries
         return AgentOutput(
             response="I can help you with room service orders, housekeeping items, or checking "
                     "your request status. Would you like to:\n"

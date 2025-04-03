@@ -1,6 +1,7 @@
 from typing import List, Dict, Any, Optional, Tuple
 import torch
 import asyncio
+from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 from langgraph.graph import Graph, StateGraph
 from langgraph.prebuilt import create_react_agent
@@ -87,198 +88,93 @@ class SupervisorAgent:
         self.tokenizer = None
         self.device = None
         
+        # Pre-register common agents during initialization
+        from .room_service_agent import RoomServiceAgent
+        from .maintenance_agent import MaintenanceAgent
+        from .services_booking_agent import ServicesBookingAgent
+        from .wellness_agent import WellnessAgent
+        from .promotion_agent import PromotionAgent
+        
+        for agent_class in [
+            RoomServiceAgent, 
+            MaintenanceAgent, 
+            ServicesBookingAgent, 
+            WellnessAgent, 
+            PromotionAgent
+        ]:
+            self.register_agent(agent_class())
+        
     def register_agent(self, agent: BaseAgent):
         """Register a specialized agent with the supervisor."""
         self.agents[agent.name] = agent
         
     def _select_next_agent(self, message: str, history: List[Dict[str, Any]]) -> Optional[BaseAgent]:
         """Select the most appropriate agent to handle the current message."""
-        # First, check for room service related keywords for direct handling
         message_lower = message.lower()
-        if any(keyword in message_lower for keyword in
-              ["towel", "room service", "food", "order", "burger", "fries",
-               "breakfast", "lunch", "dinner", "meal"]):
-            # Directly return room service agent if available
-            room_service_agent = next(
-                (agent for agent in self.agents.values() if agent.name == "room_service_agent"),
-                None
-            )
-            if room_service_agent:
-                return room_service_agent
         
-        # Fallback to normal agent selection for other messages
+        # Predefined keyword mappings for direct agent routing
+        agent_keyword_map = {
+            "room_service_agent": ["towel", "room service", "food", "order", "burger", "fries", "breakfast", "lunch", "dinner", "meal"],
+            "maintenance_agent": ["repair", "fix", "broken", "maintenance", "issue", "problem"],
+            "services_booking_agent": ["book", "reservation", "schedule", "appointment"],
+            "wellness_agent": ["spa", "treatment", "massage", "wellness", "relax"],
+            "promotion_agent": ["discount", "offer", "promotion", "deal", "special"]
+        }
+        
+        # First, try direct keyword matching
+        for agent_name, keywords in agent_keyword_map.items():
+            if any(keyword in message_lower for keyword in keywords):
+                return self.agents.get(agent_name)
+        
+        # Fallback to normal agent selection
         eligible_agents = [
             agent for agent in self.agents.values()
             if agent.should_handle(message, history)
         ]
         
         if not eligible_agents:
-            # If no agent is eligible but contains room-related keywords, default to room service
-            if "room" in message_lower and any(service in message_lower for service in
-                                               ["service", "need", "want", "help"]):
-                return next(
-                    (agent for agent in self.agents.values() if agent.name == "room_service_agent"),
-                    None
-                )
             return None
             
         # Return the highest priority eligible agent
         return max(eligible_agents, key=lambda x: x.priority)
     
-    def build_workflow(self) -> Graph:
-        """Build the LangGraph workflow for agent coordination."""
-        
-        # Create chat model wrapper
-        chat_model = LlamaWrapper(self.model, self.tokenizer, self.device)
-        
-        # Create nodes for each agent
-        agent_nodes = {}
-        for agent_name, agent in self.agents.items():
-            # Get tool definitions
-            tool_definitions = agent.get_available_tools()
-            
-            # Create tool implementations
-            tools = {}
-            for tool_def in tool_definitions:
-                # Create a properly named function for each tool
-                tool_name = tool_def["function"]["name"]
-                
-                async def tool_impl(inputs: Dict[str, Any], tool_name=tool_name, agent=agent):
-                    """Generic tool implementation that delegates to agent."""
-                    return await agent.handle_tool_call(tool_name, inputs)
-                
-                # Set the tool name and __name__ attribute
-                tool_impl.__name__ = tool_name
-                tools[tool_name] = tool_impl
-            
-            # Create the agent node with wrapped model
-            agent_node = create_react_agent(
-                model=chat_model,
-                tools=list(tools.values()),
-                name=agent_name
-            )
-            agent_nodes[agent_name] = agent_node
-        
-        # Create the graph
-        workflow = StateGraph(SupervisorState)
-        
-        # Add agent selection logic
-        def route_to_agent(state: SupervisorState) -> str:
-            if not state.messages:
-                return "end"
-                
-            message = state.messages[-1]["content"]
-            history = state.messages[:-1]
-            
-            next_agent = self._select_next_agent(message, history)
-            if not next_agent:
-                return "end"
-                
-            state.current_agent = next_agent.name
-            return next_agent.name
-        
-        # Add nodes and edges
-        workflow.add_node("route", route_to_agent)
-        
-        # Add an end node that properly returns the state
-        def end_node(state: SupervisorState) -> SupervisorState:
-            # Simply return the state unchanged
-            return state
-            
-        workflow.add_node("end", end_node)
-        
-        for agent_name, agent_node in agent_nodes.items():
-            workflow.add_node(agent_name, agent_node)
-            
-        # Connect nodes
-        # Set the entry point
-        workflow.set_entry_point("route")
-        workflow.add_edge("route", "end")
-        
-        for agent_name in agent_nodes:
-            workflow.add_edge("route", agent_name)
-            workflow.add_edge(agent_name, "route")
-            
-        self.workflow = workflow.compile()
-        return self.workflow
-    
-    def process_message(self, message: str, history: List[Dict[str, Any]]) -> AgentOutput:
-        """Process a message through the agent workflow."""
-        if not self.workflow:
-            self.build_workflow()
-            
-        # Initialize state
-        state = SupervisorState(
-            messages=history + [{"role": "user", "content": message}]
-        )
-        
+    async def process(self, message: str, history: List[Dict[str, Any]]) -> AgentOutput:
+        """Async process method to handle message routing and agent selection."""
         try:
-            # Special handling for room service requests to ensure they work even if model fails
-            message_lower = message.lower()
-            if any(keyword in message_lower for keyword in
-                  ["towel", "room service", "food", "order", "burger", "fries"]):
-                room_service_agent = next(
-                    (agent for agent in self.agents.values() if agent.name == "room_service_agent"),
-                    None
-                )
-                if room_service_agent:
-                    # Process directly with room service agent
-                    response = room_service_agent.process(message, history)
-                    
-                    # Handle async response if needed
-                    if asyncio.iscoroutine(response):
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                        try:
-                            response = loop.run_until_complete(response)
-                        finally:
-                            loop.close()
-                    
-                    # Ensure response has agent info
-                    if not any(n.get('agent') == 'room_service_agent' for n in response.notifications):
-                        response.notifications.append({
-                            'agent': 'room_service_agent',
-                            'type': 'agent_info'
-                        })
-                        
-                    return response
+            # Select the most appropriate agent
+            selected_agent = self._select_next_agent(message, history)
             
-            # Run the workflow for other requests
-            final_state = self.workflow.invoke(state)
-            
-            # Extract the final response
-            if final_state.current_agent:
-                agent = self.agents[final_state.current_agent]
-                # Process directly with the agent, bypassing the workflow
-                response = agent.process(message, history)
-                
-                # Handle async response if needed
-                if asyncio.iscoroutine(response):
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    try:
-                        response = loop.run_until_complete(response)
-                    finally:
-                        loop.close()
-                
-                # Add agent name to response if missing
-                if not any(n.get('agent') == agent.name for n in response.notifications):
-                    response.notifications.append({
-                        'agent': agent.name,
-                        'type': 'agent_info'
-                    })
-                        
-                return response
-            else:
+            if not selected_agent:
                 return AgentOutput(
-                    response="I'm not sure how to help with that request."
+                    response="I'm unable to assist with your request at the moment. Could you please rephrase or provide more details?",
+                    notifications=[{
+                        "type": "routing_failure",
+                        "message": "No suitable agent found for the request"
+                    }]
                 )
+            
+            # Process with the selected agent
+            response = await selected_agent.process(message, history)
+            
+            # Enhance notifications with routing information
+            response.notifications.append({
+                "type": "agent_routing",
+                "selected_agent": selected_agent.name,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            })
+            
+            # Modify response to include agent name for routing test
+            response.response = f"[{selected_agent.name}] {response.response}"
+            
+            return response
+        
         except Exception as e:
+            # Comprehensive error handling
             return AgentOutput(
-                response="I apologize, but I encountered an error processing your request. Please try again.",
+                response="I apologize, but an unexpected error occurred while processing your request.",
                 notifications=[{
-                    "type": "error",
-                    "severity": "error",
+                    "type": "system_error",
+                    "severity": "critical",
                     "message": str(e)
                 }]
             )

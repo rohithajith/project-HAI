@@ -1,6 +1,6 @@
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
-from datetime import datetime, time
+from datetime import datetime, time, timezone
 from .base_agent import BaseAgent, AgentOutput, ToolDefinition, ToolParameters, ToolParameterProperty
 
 class BookingResource(BaseModel):
@@ -57,6 +57,21 @@ class ServicesBookingAgent(BaseAgent):
                 )
             ),
             ToolDefinition(
+                name="check_service_availability",
+                description="Check availability of services",
+                parameters=ToolParameters(
+                    type="object",
+                    properties={
+                        "service_type": ToolParameterProperty(
+                            type="string",
+                            description="Type of service to check",
+                            enum=["spa", "gym", "restaurant", "conference_room"]
+                        )
+                    },
+                    required=["service_type"]
+                )
+            ),
+            ToolDefinition(
                 name="create_booking",
                 description="Create a new resource booking",
                 parameters=ToolParameters(
@@ -105,6 +120,82 @@ class ServicesBookingAgent(BaseAgent):
                 )
             )
         ]
+
+    async def handle_tool_call(self, tool_name: str, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Handle a tool call by executing the appropriate tool logic.
+
+        Args:
+            tool_name: Name of the tool to execute
+            inputs: Tool input parameters
+
+        Returns:
+            Tool execution results
+        """
+        # Find the tool definition
+        tool = next((t for t in self.tools if t.name == tool_name), None)
+        if not tool:
+            raise ValueError(f"Tool {tool_name} not found")
+            
+        # Validate inputs against tool parameters
+        required = tool.parameters.required or []
+        for param in required:
+            if param not in inputs:
+                raise ValueError(f"Missing required parameter: {param}")
+                
+        # Execute tool-specific logic
+        if tool_name == "check_service_availability":
+            service_type = inputs.get("service_type")
+            
+            # Mock availability check
+            availability_map = {
+                "spa": {
+                    "available": True,
+                    "next_available_slot": "Today at 2 PM",
+                    "estimated_wait": "15 minutes"
+                },
+                "gym": {
+                    "available": True,
+                    "next_available_slot": "Now",
+                    "estimated_wait": "0 minutes"
+                },
+                "restaurant": {
+                    "available": True,
+                    "next_available_slot": "Today at 7 PM",
+                    "estimated_wait": "30 minutes"
+                },
+                "conference_room": {
+                    "available": True,
+                    "next_available_slot": "Tomorrow at 10 AM",
+                    "estimated_wait": "None"
+                }
+            }
+            
+            return availability_map.get(service_type, {
+                "available": False,
+                "message": "Service not found"
+            })
+        
+        # Existing tool implementations
+        if tool_name == "check_resource_availability":
+            return {
+                "available": True,
+                "estimated_wait": "15 minutes"
+            }
+        elif tool_name == "create_booking":
+            return {
+                "booking_id": "BOOK123",
+                "status": "confirmed",
+                "estimated_delivery": "30 minutes"
+            }
+        elif tool_name == "modify_booking":
+            return {
+                "booking_id": inputs.get("booking_id"),
+                "status": "modified",
+                "message": "Booking updated successfully"
+            }
+        
+        raise NotImplementedError(f"Tool {tool_name} not implemented")
 
     def should_handle(self, message: str, history: List[Dict[str, Any]]) -> bool:
         """Determine if this agent should handle the message."""
@@ -206,7 +297,7 @@ class ServicesBookingAgent(BaseAgent):
                     "4. Duration of booking",
             notifications=[{
                 "type": "availability_inquiry",
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }]
         )
 
@@ -231,7 +322,7 @@ class ServicesBookingAgent(BaseAgent):
             notifications=[{
                 "type": "booking_initiated",
                 "room_number": room_number,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }]
         )
 
@@ -251,7 +342,7 @@ class ServicesBookingAgent(BaseAgent):
             notifications=[{
                 "type": "modification_requested",
                 "room_number": room_number,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }]
         )
 
@@ -272,7 +363,7 @@ class ServicesBookingAgent(BaseAgent):
             notifications=[{
                 "type": "cancellation_requested",
                 "room_number": room_number,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }]
         )
 
@@ -295,6 +386,6 @@ class ServicesBookingAgent(BaseAgent):
                     "4. Learn more about our facilities?",
             notifications=[{
                 "type": "general_booking_inquiry",
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }]
         )
