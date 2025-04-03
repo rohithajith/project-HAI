@@ -58,7 +58,7 @@ This project implements a hotel AI system with a chatbot interface that connects
 ## Testing the System Flow
 
 1. Open the Guest Chatbot page and enter your room number (e.g., 101)
-2. Send a message like "I need extra towels" or "Can I order room service?"
+2. Send a message like "I need extra towels" or "can i get a room cleaning??"
 3. The request will be processed by the local LLM through the agent system
 4. Check the appropriate dashboard (Room Service or Admin) to see the notification
 5. Use the dashboard controls to manage request status (Start Preparing, Mark Delivered)

@@ -1,0 +1,196 @@
+/* Global Styles for Hotel AI Frontend */
+
+:root {
+    /* Color Palette */
+    --primary-color: #007bff;
+    --secondary-color: #6c757d;
+    --success-color: #28a745;
+    --warning-color: #ffc107;
+    --danger-color: #dc3545;
+    --light-color: #f8f9fa;
+    --dark-color: #343a40;
+
+    /* Typography */
+    --font-family: 'Arial', sans-serif;
+    --base-font-size: 16px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-family);
+    line-height: 1.6;
+    background-color: var(--light-color);
+    color: var(--dark-color);
+}
+
+/* Layout */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 20px;
+    padding: 20px;
+}
+
+/* Chatbot Styles */
+.chatbot-header {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chatbox {
+    height: 400px;
+    overflow-y: auto;
+    border: 1px solid var(--secondary-color);
+    padding: 15px;
+    background-color: white;
+}
+
+.message-container {
+    display: flex;
+    flex-direction: column;
+}
+
+.message {
+    max-width: 80%;
+    margin: 10px 0;
+    padding: 10px 15px;
+    border-radius: 10px;
+    clear: both;
+}
+
+.message.user {
+    align-self: flex-end;
+    background-color: var(--primary-color);
+    color: white;
+    margin-left: auto;
+}
+
+.message.bot {
+    align-self: flex-start;
+    background-color: var(--light-color);
+    color: var(--dark-color);
+}
+
+.message.welcome-message {
+    text-align: center;
+    font-style: italic;
+}
+
+/* Input Area */
+.input-area {
+    display: flex;
+    margin-top: 15px;
+}
+
+.input-area input {
+    flex-grow: 1;
+    padding: 10px;
+    border: 1px solid var(--secondary-color);
+    border-radius: 4px;
+}
+
+.input-area button {
+    padding: 10px 15px;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    margin-left: 10px;
+    cursor: pointer;
+}
+
+.input-area button:disabled {
+    background-color: var(--secondary-color);
+    cursor: not-allowed;
+}
+
+/* Room Validation */
+.room-validation {
+    margin-bottom: 15px;
+}
+
+.error-message {
+    color: var(--danger-color);
+    font-size: 0.9em;
+    margin-top: 5px;
+    display: none;
+}
+
+/* Connection Status */
+.status-indicator {
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-weight: bold;
+}
+
+.status-indicator.connected {
+    background-color: var(--success-color);
+    color: white;
+}
+
+.status-indicator.disconnected {
+    background-color: var(--danger-color);
+    color: white;
+}
+
+/* Notifications Panel */
+.notifications-panel {
+    background-color: white;
+    border: 1px solid var(--secondary-color);
+    border-radius: 4px;
+    padding: 15px;
+}
+
+.notification {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding: 10px;
+    border-radius: 4px;
+}
+
+.notification.high {
+    background-color: rgba(220, 53, 69, 0.1);
+    border-left: 4px solid var(--danger-color);
+}
+
+.notification.medium {
+    background-color: rgba(255, 193, 7, 0.1);
+    border-left: 4px solid var(--warning-color);
+}
+
+.notification.low {
+    background-color: rgba(40, 167, 69, 0.1);
+    border-left: 4px solid var(--success-color);
+}
+
+.notification-type {
+    font-weight: bold;
+    margin-right: 10px;
+}
+
+.notification-message {
+    flex-grow: 1;
+}
+
+.notification-time {
+    color: var(--secondary-color);
+    font-size: 0.8em;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+}
