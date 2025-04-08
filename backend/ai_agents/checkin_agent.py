@@ -84,12 +84,10 @@ class CheckInAgent(BaseAgent):
                         "for necessary information at the appropriate time."
             )
 
-        # Content filtering
-        if self._contains_harmful_content(message):
-            return AgentOutput(
-                response="I apologize, but I cannot process messages containing inappropriate "
-                        "or harmful content. How else may I assist you with your check-in?"
-            )
+        # Content filtering using BaseAgent's method
+        filter_result = self.check_content_safety(message, history)
+        if not filter_result.is_harmful and filter_result.severity > self.max_severity_threshold : # Check severity threshold
+             return self.create_safety_violation_response(filter_result)
 
         # Extract booking reference if available
         booking_ref = self._extract_booking_reference(message, history)
@@ -111,14 +109,7 @@ class CheckInAgent(BaseAgent):
         import re
         return any(re.search(pattern, message) for pattern in sensitive_patterns)
 
-    def _contains_harmful_content(self, message: str) -> bool:
-        """Check for harmful or inappropriate content."""
-        harmful_keywords = [
-            "lgbtq", "rape", "bomb", "terror", "politics",
-            "weapon", "drugs", "explicit", "offensive"
-        ]
-        message_lower = message.lower()
-        return any(keyword in message_lower for keyword in harmful_keywords)
+    # Removed redundant _contains_harmful_content method. Using BaseAgent's filtering now.
 
     def _extract_booking_reference(self, message: str, history: List[Dict[str, Any]]) -> Optional[str]:
         """Extract booking reference from message or history."""

@@ -91,10 +91,18 @@ class RoomServiceAgent(BaseAgent):
 
     async def process(self, message: str, history: List[Dict[str, Any]]) -> AgentOutput:
         """Process room service related requests."""
+        # Content filtering first
+        filter_result = self.check_content_safety(message, history)
+        if not filter_result.is_harmful and filter_result.severity > self.max_severity_threshold : # Check severity threshold
+             return self.create_safety_violation_response(filter_result)
+
         # Extract room number
         room_number = self._extract_room_number(message, history)
-        
+
         if not room_number:
+            # If room number is essential and not found, ask for it.
+            # Consider if the request could be partially handled without it (e.g., menu request).
+            # For now, requiring room number for most actions.
             return AgentOutput(
                 response="To help you with room service, could you please provide your room number?",
                 notifications=[{
@@ -166,14 +174,7 @@ class RoomServiceAgent(BaseAgent):
             }]
         )
 
-    def _contains_harmful_content(self, message: str) -> bool:
-        """Check for harmful or inappropriate content."""
-        harmful_keywords = [
-            "rape", "bomb", "terror", "politics",
-            "weapon", "drugs", "explicit", "offensive"
-        ]
-        message_lower = message.lower()
-        return any(keyword in message_lower for keyword in harmful_keywords)
+    # Removed redundant _contains_harmful_content method. Using BaseAgent's filtering now.
 
     def _is_in_room_service_conversation(self, history: List[Dict[str, Any]]) -> bool:
         """Check if we're in an ongoing room service conversation."""

@@ -278,38 +278,32 @@ class BaseAgent(ABC):
     async def handle_tool_call(self, tool_name: str, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """
         Handle a tool call by executing the appropriate tool logic.
-        
+        This method should be overridden by subclasses that define tools.
+
         Args:
             tool_name: Name of the tool to execute
             inputs: Tool input parameters
-            
+
         Returns:
             Tool execution results
+
+        Raises:
+            ValueError: If the tool is not found or required parameters are missing.
+            NotImplementedError: If the specific tool logic is not implemented in the subclass.
         """
         # Find the tool definition
         tool = next((t for t in self.tools if t.name == tool_name), None)
         if not tool:
-            raise ValueError(f"Tool {tool_name} not found")
-            
+            raise ValueError(f"Tool '{tool_name}' not found in agent '{self.name}'")
+
         # Validate inputs against tool parameters
         required = tool.parameters.required or []
-        for param in required:
-            if param not in inputs:
-                raise ValueError(f"Missing required parameter: {param}")
-                
-        # Execute tool-specific logic
-        if tool_name == "check_menu_availability":
-            # Example implementation
-            return {
-                "available": True,
-                "estimated_wait": "15 minutes"
-            }
-        elif tool_name == "place_order":
-            # Example implementation
-            return {
-                "order_id": "ORD123",
-                "status": "confirmed",
-                "estimated_delivery": "30 minutes"
-            }
-        else:
-            raise NotImplementedError(f"Tool {tool_name} not implemented")
+        missing_params = [param for param in required if param not in inputs]
+        if missing_params:
+            raise ValueError(f"Missing required parameters for tool '{tool_name}': {', '.join(missing_params)}")
+
+        # Subclasses must implement the actual logic for their specific tools
+        raise NotImplementedError(
+            f"Tool '{tool_name}' logic not implemented in agent '{self.name}'. "
+            f"Subclasses must override handle_tool_call."
+        )

@@ -1,3 +1,10 @@
+"""
+Agent Registration: The _register_agents method correctly instantiates specialized agents and registers them with the SupervisorAgent instance using self.supervisor.register_agent(agent). This ensures the supervisor knows which agents are available.
+Processing Logic (process method):
+Direct Call (Fast Path): For messages containing specific keywords related to room service (e.g., "towel", "food", "order"), the manager directly finds the room_service_agent from the supervisor's list and calls await room_service_agent.process(...). This bypasses the supervisor for these common requests.
+Indirect Call (Delegation): For messages not matching the fast path keywords, the manager correctly delegates the task to the supervisor by calling await self.supervisor.process(...). The supervisor then handles selecting and calling the appropriate specialized agent.
+Asynchronous Calls: Both the direct calls to the room service agent and the delegation call to the supervisor correctly use await, matching the async def process signatures of the respective methods.
+"""
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 from pathlib import Path
@@ -82,7 +89,7 @@ class AgentManagerCorrected:
                 )
             )
     
-    def process(self, message: str, history: Optional[List[Dict[str, Any]]] = None) -> AgentOutput:
+    async def process(self, message: str, history: Optional[List[Dict[str, Any]]] = None) -> AgentOutput: # Added async
         """
         Process a message through the multi-agent system.
         
@@ -119,16 +126,10 @@ class AgentManagerCorrected:
                 )
                 
                 if room_service_agent:
-                    response = room_service_agent.process(message, history)
+                    # Room service agent's process is async, so await it
+                    response = await room_service_agent.process(message, history)
                     
-                    # If the response is a coroutine (async), run it in an event loop
-                    if asyncio.iscoroutine(response):
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                        try:
-                            response = loop.run_until_complete(response)
-                        finally:
-                            loop.close()
+                    # No need for manual event loop handling here as we are in an async method
                     
                     # Add agent info to response if not present
                     if isinstance(response, AgentOutput) and not any(
@@ -141,43 +142,49 @@ class AgentManagerCorrected:
                         
                     return response
             
-            # Process through standard workflow for other messages
-            response = self.supervisor.process_message(message, history)
-            
-            # If the response is a coroutine (async), run it in an event loop
-            if asyncio.iscoroutine(response):
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    response = loop.run_until_complete(response)
-                finally:
-                    loop.close()
-            
+            # Process through standard workflow for other messages via the supervisor
+            response = await self.supervisor.process(message, history) # Corrected method name
+
+            # Note: Supervisor's process method is already async, no need for separate event loop handling here.
+
             return response
             
+        except AgentError as e:
+            # Handle known agent errors using the error handler
+            error_response = error_handler.create_error_response(e)
+            # Convert ErrorResponse to AgentOutput for consistency
+            return AgentOutput(
+                response=error_response.message,
+                notifications=[{
+                    "type": "error",
+                    "severity": e.metadata.severity,
+                    "message": error_response.details or str(e),
+                    "error_code": e.error_code,
+                    "agent": e.metadata.agent_name or "agent_manager"
+                }]
+            )
         except Exception as e:
-            # Create a fallback response that includes agent type for room service requests
-            message_lower = message.lower()
-            if any(keyword in message_lower for keyword in
-                  ["towel", "room service", "food", "order", "burger", "fries"]):
-                return AgentOutput(
-                    response="Thank you for your room service request. We'll take care of it right away.",
-                    notifications=[{
-                        "type": "housekeeping_request" if "towel" in message_lower else "order_started",
-                        "agent": "room_service_agent",
-                        "severity": "info",
-                        "message": "Room service request processed"
-                    }]
+            # Handle unexpected errors
+            unexpected_error = ProcessingError(
+                message=f"Unexpected error in AgentManager: {str(e)}",
+                metadata=ErrorMetadata(
+                    severity="critical",
+                    category="unexpected",
+                    context={"component": "AgentManagerCorrected.process"}
                 )
-            else:
-                return AgentOutput(
-                    response="I apologize, but I encountered an error processing your request. Please try again.",
-                    notifications=[{
-                        "type": "error",
-                        "severity": "error",
-                        "message": str(e)
-                    }]
-                )
+            )
+            error_handler.log_error(unexpected_error)
+            error_response = error_handler.create_error_response(unexpected_error)
+            return AgentOutput(
+                response=error_response.message,
+                notifications=[{
+                    "type": "error",
+                    "severity": "critical",
+                    "message": "An unexpected system error occurred.",
+                    "error_code": unexpected_error.error_code,
+                    "agent": "agent_manager"
+                }]
+            )
 
 # Create singleton instance
 agent_manager_corrected = AgentManagerCorrected()

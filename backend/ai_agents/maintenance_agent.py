@@ -44,28 +44,7 @@ class MaintenanceAgent(BaseAgent):
                 required=['issue_type', 'description'] # Making description required for clarity
             )
         ),
-        ToolDefinition(
-            name='report_maintenance_issue',
-            description='Report a maintenance issue in the room (alias for report_issue)',
-            parameters=ToolParameters(
-                properties={
-                    'issue_type': ToolParameterProperty(
-                        type='string',
-                        description='Type of maintenance issue',
-                        enum=['plumbing', 'electrical', 'furniture', 'appliance', 'other']
-                    ),
-                    'room_number': ToolParameterProperty(
-                        type='string',
-                        description='Room number where the issue is located'
-                    ),
-                    'description': ToolParameterProperty(
-                        type='string',
-                        description='Detailed description of the issue'
-                    )
-                },
-                required=['issue_type', 'room_number', 'description']
-            )
-        ),
+        # Removed redundant 'report_maintenance_issue' tool definition (alias for report_issue)
         ToolDefinition(
             name='schedule_maintenance',
             description='Schedule non-urgent maintenance',

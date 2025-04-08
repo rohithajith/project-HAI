@@ -1,89 +1,32 @@
+"""
+Selection Logic (_select_next_agent): The method uses a two-tiered approach:
+It first attempts to match keywords in the user's message against predefined lists associated with specific agents (agent_keyword_map). If a match is found, that agent is selected immediately.
+If no keywords match, it iterates through all registered agents, calling their should_handle method. Agents returning True are considered eligible.
+From the eligible agents (if any), the one with the highest priority value is chosen.
+If no agent is eligible, None is returned.
+Calling Logic (process):
+It correctly calls _select_next_agent to determine the handler.
+It handles the case where no agent is selected by returning an appropriate message.
+If an agent is selected, it correctly calls await selected_agent.process(message, history) to execute the chosen agent's logic.
+It includes error handling for both expected AgentError types and unexpected Exception occurrences during selection or processing.
+"""
 from typing import List, Dict, Any, Optional, Tuple
 import torch
 import asyncio
 from datetime import datetime, timezone
-from pydantic import BaseModel, Field
-from langgraph.graph import Graph, StateGraph
-from langgraph.prebuilt import create_react_agent
+from pydantic import BaseModel, Field # Removed LangGraph imports
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, BaseMessage
 from .base_agent import BaseAgent, AgentOutput
-
-class LlamaWrapper(BaseChatModel):
-    """Wrapper to make LlamaForCausalLM work with LangGraph."""
-    
-    model: Any = None
-    tokenizer: Any = None
-    device: Any = None
-    
-    def __init__(self, model, tokenizer, device):
-        super().__init__()
-        self.model = model
-        self.tokenizer = tokenizer
-        self.device = device
-        
-    def _generate(
-        self,
-        messages: List[BaseMessage],
-        stop: Optional[List[str]] = None,
-        run_manager: Optional[Any] = None,
-        **kwargs: Any,
-    ) -> str:
-        try:
-            # Convert messages to prompt
-            prompt = ""
-            for message in messages:
-                if isinstance(message, HumanMessage):
-                    prompt += f"Human: {message.content}\n"
-                elif isinstance(message, AIMessage):
-                    prompt += f"Assistant: {message.content}\n"
-            prompt += "Assistant: "  # Add prefix for response
-                
-            # Generate response using local model
-            inputs = self.tokenizer(prompt, return_tensors="pt", padding=True, truncation=True).to(self.device)
-            with torch.no_grad():
-                outputs = self.model.generate(
-                    inputs["input_ids"],
-                    max_new_tokens=512,  # Limit response length
-                    do_sample=True,
-                    temperature=0.7,
-                    top_p=0.9,
-                    pad_token_id=self.tokenizer.pad_token_id,
-                    eos_token_id=self.tokenizer.eos_token_id,
-                )
-            
-            # Decode response
-            response = self.tokenizer.decode(outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
-            return response.strip()
-            
-        except Exception as e:
-            print(f"Error in _generate: {str(e)}")
-            return "I apologize, but I encountered an error processing your request."
-        
-    def _llm_type(self) -> str:
-        return "llama_wrapper"
-        
-    def bind_tools(self, tools, **kwargs):
-        """
-        Implement bind_tools method required by BaseChatModel.
-        This is a simple implementation that just returns self since we're handling tools manually.
-        """
-        # Just return self since we're not actually binding tools in the traditional sense
-        return self
-
-class SupervisorState(BaseModel):
-    """State maintained between agent calls in the workflow."""
-    messages: List[Dict[str, Any]] = Field(default_factory=list)
-    current_agent: Optional[str] = None
-    completed_agents: List[str] = Field(default_factory=list)
-    context: Dict[str, Any] = Field(default_factory=dict)
-
+from .error_handler import error_handler, AgentError, ProcessingError, ErrorMetadata # Import error handling components
+# LlamaWrapper removed as it's not directly used here; model/tokenizer are passed from AgentManager
+# Removed unused SupervisorState class
 class SupervisorAgent:
     """Coordinates workflow between specialized agents."""
     
     def __init__(self):
         self.agents: Dict[str, BaseAgent] = {}
-        self.workflow: Optional[Graph] = None
+        # self.workflow: Optional[Graph] = None # Workflow not used in current logic
         self.model = None
         self.tokenizer = None
         self.device = None
@@ -108,43 +51,7 @@ class SupervisorAgent:
         """Register a specialized agent with the supervisor."""
         self.agents[agent.name] = agent
         
-    def build_workflow(self) -> Optional[Graph]:
-        """
-        Build a basic workflow for agent coordination.
-        This is a placeholder implementation to satisfy the method call.
-        """
-        try:
-            # Create a simple state graph
-            workflow = StateGraph(SupervisorState)
-            
-            # Add a basic routing node
-            def route_to_agent(state: SupervisorState) -> str:
-                if not state.messages:
-                    return "end"
-                
-                message = state.messages[-1]["content"]
-                history = state.messages[:-1]
-                
-                next_agent = self._select_next_agent(message, history)
-                
-                return next_agent.name if next_agent else "end"
-            
-            # Add nodes and basic routing
-            workflow.add_node("route", route_to_agent)
-            workflow.add_node("end", lambda state: state)
-            
-            # Set basic workflow structure
-            workflow.set_entry_point("route")
-            workflow.add_edge("route", "end")
-            
-            # Compile the workflow
-            self.workflow = workflow.compile()
-            return self.workflow
-        
-        except Exception as e:
-            print(f"Error building workflow: {e}")
-            return None
-        
+    # Removed build_workflow method as LangGraph is not used in the current process logic
     def _select_next_agent(self, message: str, history: List[Dict[str, Any]]) -> Optional[BaseAgent]:
         """Select the most appropriate agent to handle the current message."""
         message_lower = message.lower()
@@ -205,13 +112,42 @@ class SupervisorAgent:
             
             return response
         
-        except Exception as e:
-            # Comprehensive error handling
+        except AgentError as e:
+            # Handle known agent errors from the selected agent's process method
+            # Enrich metadata if possible
+            e.metadata.agent_name = e.metadata.agent_name or selected_agent.name if selected_agent else "supervisor"
+            error_handler.log_error(e)
+            error_response = error_handler.create_error_response(e)
             return AgentOutput(
-                response="I apologize, but an unexpected error occurred while processing your request.",
+                response=error_response.message,
                 notifications=[{
-                    "type": "system_error",
+                    "type": "error",
+                    "severity": e.metadata.severity,
+                    "message": error_response.details or str(e),
+                    "error_code": e.error_code,
+                    "agent": e.metadata.agent_name
+                }]
+            )
+        except Exception as e:
+            # Handle unexpected errors during supervisor processing
+            unexpected_error = ProcessingError(
+                message=f"Unexpected error in SupervisorAgent: {str(e)}",
+                metadata=ErrorMetadata(
+                    severity="critical",
+                    category="supervisor_unexpected",
+                    agent_name="supervisor",
+                    context={"component": "SupervisorAgent.process"}
+                )
+            )
+            error_handler.log_error(unexpected_error)
+            error_response = error_handler.create_error_response(unexpected_error)
+            return AgentOutput(
+                response=error_response.message,
+                notifications=[{
+                    "type": "error",
                     "severity": "critical",
-                    "message": str(e)
+                    "message": "An unexpected system error occurred during request routing.",
+                    "error_code": unexpected_error.error_code,
+                    "agent": "supervisor"
                 }]
             )

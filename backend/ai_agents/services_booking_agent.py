@@ -217,12 +217,10 @@ class ServicesBookingAgent(BaseAgent):
 
     async def process(self, message: str, history: List[Dict[str, Any]]) -> AgentOutput:
         """Process booking related requests."""
-        # Content filtering
-        if self._contains_harmful_content(message):
-            return AgentOutput(
-                response="I apologize, but I cannot process messages containing inappropriate "
-                        "content. How else may I assist you with booking services?"
-            )
+        # Content filtering using BaseAgent's method
+        filter_result = self.check_content_safety(message, history)
+        if not filter_result.is_harmful and filter_result.severity > self.max_severity_threshold : # Check severity threshold
+             return self.create_safety_violation_response(filter_result)
 
         # Extract room number if available
         room_number = self._extract_room_number(history)
@@ -239,14 +237,7 @@ class ServicesBookingAgent(BaseAgent):
         else:
             return await self._handle_general_inquiry()
 
-    def _contains_harmful_content(self, message: str) -> bool:
-        """Check for harmful or inappropriate content."""
-        harmful_keywords = [
-            "lgbtq", "rape", "bomb", "terror", "politics",
-            "weapon", "drugs", "explicit", "offensive"
-        ]
-        message_lower = message.lower()
-        return any(keyword in message_lower for keyword in harmful_keywords)
+    # Removed redundant _contains_harmful_content method. Using BaseAgent's filtering now.
 
     def _is_in_booking_conversation(self, history: List[Dict[str, Any]]) -> bool:
         """Check if we're in an ongoing booking conversation."""
