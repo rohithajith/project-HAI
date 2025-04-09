@@ -21,7 +21,7 @@ pip install transformers
 pip install -r requirements.txt
 
 python .\download_hfmodel.py
-python .\teste.py
 python .\backend\local_model_chatbot.py
+python .\teste.py
 echo Setup Complete.
 pause
