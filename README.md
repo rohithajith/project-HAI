@@ -1,6 +1,8 @@
-# AI Agents System (`backend/ai_agents`)
+this project is for hotels websites for the guest to interact with agents chatbot 
+we will build the backend logic first 
 
-This directory contains the core components of the multi-agent AI system designed for hotel guest interactions. It utilizes a supervisor-worker pattern where a `SupervisorAgent` routes requests to specialized agents based on the user's message content and predefined priorities.
+# AI Agents System (`backend/ai_agents`)
+ It utilizes a supervisor-worker pattern where a `SupervisorAgent` routes requests to specialized agents based on the user's message content and predefined priorities.
 
 ## Core Components
 
