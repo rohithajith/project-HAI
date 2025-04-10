@@ -18,18 +18,10 @@ pip install bitsandbytes-cuda110 bitsandbytes
 REM Install accelerate
 pip install accelerate
 pip install transformers
-pip install langchain
-pip install langchain_huggingface
-pip install langchain_community
-pip install langchain_openai
-pip install sentence-transformers
-pip install langgraph
-pip install pydantic-ai
-pip install fastapi
-pip install sqlalchemy
-pip install "uvicorn[standard]"
+pip install -r requirements.txt
 
 python .\download_hfmodel.py
+python .\backend\local_model_chatbot.py
 python .\teste.py
 echo Setup Complete.
 pause

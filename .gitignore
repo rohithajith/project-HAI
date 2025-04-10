@@ -5,6 +5,8 @@ node_modules/
 # Ignore the virtual environment
 virtual/
 venv/
+devv/
+.devv/
 .venv/
 
 # Ignore compiled Python files
@@ -63,10 +65,7 @@ node_modules/
 
 # Python virtual environments
 venv/
-develop/
-**/Lib/site-packages/
-**/.venv/
-**/__pycache__/
+__pycache__/
 *.pyc
 *.pyo
 *.pyd
