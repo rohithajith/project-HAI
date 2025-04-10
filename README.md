@@ -1,97 +1,88 @@
-# Hotel AI System with Local LLM and Flask
+# AI Agents System (`backend/ai_agents`)
 
-This project implements a hotel AI system with a chatbot interface that connects to AI agents for handling various guest requests. The system uses Flask with Socket.IO for real-time communication and local LLM integration for processing requests.
+This directory contains the core components of the multi-agent AI system designed for hotel guest interactions. It utilizes a supervisor-worker pattern where a `SupervisorAgent` routes requests to specialized agents based on the user's message content and predefined priorities.
 
-## Features
+## Core Components
 
-- Guest chatbot interface for making requests
-- Room service dashboard for handling food and drink orders
-- Admin dashboard for maintenance requests and bookings
-- AI agents that process guest requests using local LLM
-- Real-time updates using Socket.IO
-- Local model processing without external API calls
+*   **`BaseAgent` (`base_agent.py`):**
+    *   An abstract base class defining the standard interface for all specialized agents.
+    *   Provides common functionalities:
+        *   Tool definition and handling (`ToolDefinition`, `get_available_tools`, `handle_tool_call`).
+        *   Standardized output structure as a json object by the agents (`AgentOutput`).
+        *   Utility methods for structuring the output based on the user input.
+*   **`AgentManager` (`agent_manager.py`):**
+    *   The main entry point for processing user messages within the agent system.
+    *   Initializes and registers all specialized agents with the `SupervisorAgent`.
+    *   Loads the local language model and tokenizer, passing them to the agents.
+    *   Implements a "fast path" routing: If a message contains specific keywords related to common room service requests (e.g., "towel", "food", "order", "burger"), it directly calls the `RoomServiceAgent`.
+    *   For other messages, it delegates processing to the `SupervisorAgent`.
+    *   Includes top-level error handling.
+*   **`SupervisorAgent` (`supervisor_agent.py`):**
+    *   Acts as the central router or coordinator.
+    *   Maintains a registry of all specialized agents.
+    *   Implements `_select_next_agent(message, history)` logic:
+        1.  Checks for direct keyword matches defined in `agent_keyword_map`.
+        2.  If no keyword match, iterates through registered agents, calling their `should_handle` method.
+        3.  Selects the agent with the highest `priority` among those that can handle the request.
+    *   Calls the `process` method of the selected specialized agent.
+    *   Handles cases where no suitable agent is found.
+    *   Includes error handling for the routing and agent processing steps.
 
-## Architecture
+## Specialized Agents
 
-- **Backend**:
-  - Flask server with Socket.IO for real-time communication
-  - Python-based AI agents using local LLM for processing guest requests
-  - LangGraph for agent orchestration
-  - Pydantic for schema validation
+These agents inherit from `BaseAgent` and handle specific domains:
+all agents will tackle the input given by suporvisor / agentmanager and produce a json object with the given input 
+*   **`CheckInAgent` (`checkin_agent.py`):**
+    *   **Purpose:** Manages guest check-in processes.
+    *   **Keywords:** "check in", "arrival", "booking", "reservation", "room key".
+    *   **Tools:** `verify_id`.
+    *   **Notes:** Agent checks in the hotel_bookings.db to check the id is existing or not and  guides users through check-in steps or verifies existing bookings.
+*   **`MaintenanceAgent` (`maintenance_agent.py`):**
+    *   **Purpose:** Handles guest reports of maintenance issues and scheduling requests.
+    *   **Keywords:** "broken", "repair", "fix", "not working", "schedule maintenance".
+    *   **Tools:** `report_issue`, `schedule_maintenance`.
+    *   **Notes:** Use notification [] array and add the notification into it everytiime its called / service to report issues.
+*   **`PromotionAgent` (`promotion_agent.py`):**
+    *   **Purpose:** Informs guests about promotions like theme nights and happy hours.
+    *   **Keywords:** "promotion", "theme night", "happy hour", "deal", "discount", "events".
+    *   **Tools:** `add_promotional_content`, `query_promotions`.
+    *   **Notes:** Utilizes Retrieval-Augmented Generation (RAG) with embeddings to query relevant promotional information availble in data\policy.txt.
+*   **`RoomServiceAgent` (`room_service_agent.py`):**
+    *   **Purpose:** Handles requests for room service (food, drinks, towels, amenities).
+    *   **Keywords:** "room service", "food", "drink", "towel", "order", "burger", "fries".
+    *   **Tools:** `check_menu_availability`, `place_order`.
+    *   **Notes:** Has high priority. Can be called directly by `AgentManager` for specific keywords (fast path). add request to notifications [] array when triggered.
+*   **`ServicesBookingAgent` (`services_booking_agent.py`):**
+    *   **Purpose:** Manages bookings for hotel services like meeting rooms and co-working spaces.
+    *   **Keywords:** "meeting room", "book", "reserve", "workspace", "conference room".
+    *   **Tools:**  `check_service_availability`, `create_booking`
+    *   **Notes:** create_booking will add request to notifications [] array when triggered.
+*   **`WellnessAgent` (`wellness_agent.py`):**
+    *   **Purpose:** Handles requests related to wellness services (spa, yoga, meditation, fitness).
+    *   **Keywords:** "wellness", "meditation", "yoga", "fitness", "spa", "relax".
+    *   **Tools:**  `book_session`.
+    *   **Notes:** book_session will add add request to notifications [] array when triggered.
 
-- **Frontend**:
-  - Unified Flask application serving three interfaces:
-    - Guest Chatbot: For guests to interact with the AI
-    - Admin Dashboard: For admin notifications
-    - Room Service Dashboard: For room service team notifications
-  - Real-time WebSocket communication using Socket.IO
-  - Responsive UI with status management
 
-## Recent Changes
+## Supporting Modules
 
-### Frontend Changes
-- `backend/templates/base.html`: Updated base template with unified styling
-- `backend/templates/index.html`: Enhanced guest chatbot with room validation
-- `backend/templates/admin.html`: Added real-time notification system
-- `backend/templates/room_service.html`: Added request management system
 
-### Backend Changes
-- `backend/flask_app.py`: 
-  - Implemented Socket.IO namespaces for different interfaces
-  - Added proper error handling
-  - Integrated with agent manager for local LLM processing
+*   **`ErrorHandler` (`error_handler.py`):** Defines custom exceptions (`AgentError`, etc.) and provides a centralized `ErrorHandler` class for logging errors and generating standardized user-facing error responses.
+## Interaction Flow
 
-### Agent System Changes
-- `backend/ai_agents/agent_manager_corrected.py`: Enhanced for local model usage
-- `backend/ai_agents/supervisor_agent.py`: Added LangGraph workflow support
+1.  A user message enters the system via `AgentManager.process`.
+2.  **Fast Path Check:** `AgentManager` checks if the message contains specific room service keywords (e.g., "towel", "order", "burger").
+    *   **If YES:** It directly calls `RoomServiceAgent.process`.
+    *   **If NO:** It proceeds to delegate to the supervisor.
+3.  **Delegation:** `AgentManager` calls `SupervisorAgent.process`.
+4.  **Agent Selection:** `SupervisorAgent._select_next_agent` determines the best agent:
+    *   It first checks for keyword matches defined within the supervisor.
+    *   If no keyword match, it calls `should_handle` on all registered agents.
+    *   It selects the highest priority agent that returns `True` from `should_handle`.
+5.  **Agent Processing:** `SupervisorAgent` calls the `process` method of the selected agent (if any).
+    *   If no agent is selected, the supervisor returns a default message indicating it cannot handle the request.
+6.  **Response:** The specialized agent processes the request (potentially using tools, content filtering) and returns an `AgentOutput`.
+* **note** make sure to avoid where query is in loops with agents again and again 
+8.  **Formatting (Post-Processing):** The `OutputFormattingAgent` might be used by the application layer (outside this directory) to format the final `AgentOutput` before sending it to the user/frontend.
 
-## Setup and Installation
-
-1. Ensure you have the local model in `finetunedmodel-merged` directory
-2. Install requirements: `pip install -r requirements.txt`
-3. Run the Flask server: `python backend/flask_app.py`
-4. Access the interfaces:
-   - Guest Chatbot: http://localhost:5000/
-   - Admin Dashboard: http://localhost:5000/admin
-   - Room Service Dashboard: http://localhost:5000/room-service
-
-## Testing the System Flow
-
-1. Open the Guest Chatbot page and enter your room number (e.g., 101)
-2. Send a message like "I need extra towels" or "Can I order room service?"
-3. The request will be processed by the local LLM through the agent system
-4. Check the appropriate dashboard (Room Service or Admin) to see the notification
-5. Use the dashboard controls to manage request status (Start Preparing, Mark Delivered)
-
-## WebSocket Namespaces
-
-- `/guest`: For guest chatbot communication
-- `/admin`: For admin dashboard notifications
-- `/room-service`: For room service dashboard notifications
-
-## Development
-
-To modify or extend the system:
-
-1. AI Agents: Edit files in the `backend/ai_agents` directory
-2. Frontend: Edit templates in `backend/templates` directory
-3. Backend: Edit `backend/flask_app.py` as needed
-
-## Troubleshooting
-
-- If the Socket.IO connection fails, check that the Flask server is running
-- If agents aren't responding, check that the local model is properly loaded
-- Make sure all dependencies are installed correctly
-- Check the console logs for detailed error messages
-- Verify the local model path in `agent_manager_corrected.py`
-
-## Local Model Integration
-
-The system uses a local LLM model for processing requests:
-- Model Location: `finetunedmodel-merged`
-- Loading: Handled by `local_model_chatbot.py`
-- Features:
-  - 8-bit quantization
-  - Automatic device mapping
-  - Thread-safe loading
-  - Caching mechanism
+Throughout this flow, errors are caught and handled by the `ErrorHandler`, interactions can be logged by `AgentLogger`, and performance is monitored by `MonitoringSystem`. Content safety is checked via `ContentFilter` within the agents.
