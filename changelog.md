@@ -15,6 +15,7 @@
 ### Changed
 - Updated the language model loading process to use 8-bit quantization and automatic device selection
 - Modified response generation to handle longer inputs and improve output quality
+- Updated frontend README with project-specific details.
 
 ## Project Status
 

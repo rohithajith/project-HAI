@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { Modal, Button } from "react-bootstrap";
-import { FaWrench, FaSpa, FaConciergeBell } from "react-icons/fa";
+import { Modal, Button, Badge, Form } from "react-bootstrap";
+import { FaWrench, FaSpa, FaConciergeBell, FaRobot } from "react-icons/fa";
 import socket from "../socket";
+import ChatBot from "../components/ChatBot";
 import "animate.css";
+import "./Dashboard.css";
 
 const statusBadge = {
   Pending: "warning",
@@ -17,7 +19,8 @@ const typeIcons = {
   Wellness: <FaSpa className="text-danger me-2" />,
 };
 
-const Dashboard = ({ agent }) => {
+const Dashboard = () => {
+  const [agent] = useState(localStorage.getItem("agent") || "Guest");
   const [requests, setRequests] = useState(() => {
     const saved = localStorage.getItem("dashboardRequests");
     return saved ? JSON.parse(saved) : [];
@@ -25,9 +28,13 @@ const Dashboard = ({ agent }) => {
 
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [showCompletedOnly, setShowCompletedOnly] = useState(false);
+  const [showChat, setShowChat] = useState(false);
 
   useEffect(() => {
     const handleRequest = (data) => {
+      if (data.room === agent) return;
+
       const id = `${data.timestamp}-${data.room}-${data.agent}`;
       setRequests((prev) => {
         const exists = prev.some(
@@ -37,8 +44,11 @@ const Dashboard = ({ agent }) => {
           const updated = [...prev, data];
           localStorage.setItem("dashboardRequests", JSON.stringify(updated));
           return updated;
+        } else {
+          return prev.map((r) =>
+            `${r.timestamp}-${r.room}-${r.agent}` === id ? { ...r, ...data } : r
+          );
         }
-        return prev;
       });
     };
 
@@ -61,7 +71,7 @@ const Dashboard = ({ agent }) => {
       socket.off("guest_response", handleRequest);
       socket.off("rating_feedback", handleRating);
     };
-  }, []);
+  }, [agent]);
 
   const handleOpen = (room) => {
     setSelectedRoom(room);
@@ -81,14 +91,12 @@ const Dashboard = ({ agent }) => {
     );
     setRequests(updated);
     localStorage.setItem("dashboardRequests", JSON.stringify(updated));
-  
-    // ✅ Emit to backend that this request is completed (for rating trigger)
+
     socket.emit("request_completed", {
       ...requestData,
-      status: "Completed"
+      status: "Completed",
     });
   };
-  
 
   const handleReset = () => {
     localStorage.removeItem("dashboardRequests");
@@ -105,37 +113,64 @@ const Dashboard = ({ agent }) => {
   const filteredRequests =
     agent === "Admin" ? requests : requests.filter((r) => r.agent === agent);
 
-  const rooms = [...new Set(filteredRequests.map((r) => r.room))];
-  const getRoomRequests = (room) =>
-    filteredRequests.filter((r) => r.room === room);
+  const roomBased = filteredRequests.filter((r) => r.room && r.room !== r.agent);
+  const miscBased = filteredRequests.filter((r) => !r.room || r.room === r.agent);
+  const rooms = [...new Set(roomBased.map((r) => r.room))];
+  const getRoomRequests = (room) => roomBased.filter((r) => r.room === room);
+
+  const isRoomCompleted = (room) => {
+    const roomRequests = getRoomRequests(room);
+    return roomRequests.every((r) => r.status === "Completed");
+  };
+
+  const displayedRooms = showCompletedOnly
+    ? rooms.filter((room) => isRoomCompleted(room))
+    : rooms;
 
   return (
-    <div className="container py-4">
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <h2 className="text-primary animate__animated animate__fadeIn">
-          {agent === "Admin"
-            ? "🏨 Admin Dashboard"
-            : `🛎️ ${agent} Dashboard`}
+    <div className="dashboard-container">
+      <div className="dashboard-header">
+        <h2 className="animate__animated animate__fadeIn">
+          {agent === "Admin" ? "🏨 Admin Dashboard" : `🛎️ ${agent} Dashboard`}
         </h2>
-        <Button variant="outline-danger" onClick={handleReset}>
-          🔁 Reset All
-        </Button>
+        <div className="d-flex gap-3 align-items-center">
+          <Form.Check
+            type="switch"
+            label="Show Only Completed Rooms"
+            checked={showCompletedOnly}
+            onChange={(e) => setShowCompletedOnly(e.target.checked)}
+          />
+          <Button variant="outline-danger" onClick={handleReset}>
+            🔁 Reset All
+          </Button>
+        </div>
       </div>
 
-      {rooms.length === 0 && (
+      {displayedRooms.length === 0 && miscBased.length === 0 && (
         <p className="text-muted text-center">No service requests yet.</p>
       )}
 
       <div className="row g-4">
-        {rooms.map((room) => (
+        {displayedRooms.map((room) => (
           <div key={room} className="col-md-4">
             <div
-              className="card shadow border-start border-4 border-info hover-shadow animate__animated animate__fadeInUp"
+              className={`card shadow border-start border-4 hover-shadow animate__animated animate__fadeInUp dashboard-room-card ${
+                isRoomCompleted(room)
+                  ? "bg-light border-success"
+                  : "border-info"
+              }`}
               onClick={() => handleOpen(room)}
               style={{ cursor: "pointer" }}
             >
               <div className="card-body text-center">
-                <h5 className="card-title">Room #{room}</h5>
+                <h5 className="card-title">
+                  Room #{room}
+                  {isRoomCompleted(room) && (
+                    <Badge bg="success" className="ms-2">
+                      ✅ All Done
+                    </Badge>
+                  )}
+                </h5>
                 <p className="text-muted mb-0">
                   {getRoomRequests(room).length} request(s)
                 </p>
@@ -144,6 +179,24 @@ const Dashboard = ({ agent }) => {
           </div>
         ))}
       </div>
+
+      {miscBased.length > 0 && (
+        <div className="mt-4">
+          <h5 className="text-secondary mb-3">Miscellaneous Requests</h5>
+          {miscBased.map((req, idx) => (
+            <div key={idx} className="mb-4 p-3 bg-white rounded shadow-sm">
+              <div className="d-flex justify-content-between align-items-center">
+                <strong>{req.room === req.agent ? req.agent : req.room}</strong>
+                <span className={`badge bg-${statusBadge[req.status] || "secondary"}`}>
+                  {req.status || "Pending"}
+                </span>
+              </div>
+              <div className="small text-muted">🕒 {req.time || "Just now"}</div>
+              <p className="mb-1 mt-2">{req.response}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       <Modal show={showModal} onHide={handleClose} centered size="lg">
         <Modal.Header closeButton>
@@ -181,8 +234,13 @@ const Dashboard = ({ agent }) => {
                   variant="outline-success"
                   className="mt-2"
                   onClick={() =>
-                    handleStatusUpdate(req.room, req.timestamp, req.agent, req)
-                  }                  
+                    handleStatusUpdate(
+                      req.room,
+                      req.timestamp,
+                      req.agent,
+                      req
+                    )
+                  }
                 >
                   Mark as Done
                 </Button>
@@ -196,6 +254,28 @@ const Dashboard = ({ agent }) => {
           </Button>
         </Modal.Footer>
       </Modal>
+
+      <button className="chatbot-toggle-button" onClick={() => setShowChat(!showChat)}>
+        <FaRobot />
+      </button>
+
+      {showChat && (
+        <div className={`chatbot-popup ${agent !== "Guest" ? "chatbot-no-room" : ""}`}>
+          <div className="chatbot-popup-header">
+            Hotel Assistant
+            <button
+              onClick={() => setShowChat(false)}
+              style={{ background: "transparent", border: "none", color: "#fff" }}
+            >
+              ✖
+            </button>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+            <ChatBot role={agent} />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
