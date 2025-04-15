@@ -1,5 +1,6 @@
 from typing import List, Dict, Any
 from .base_agent import BaseAgent, AgentOutput
+from .rag_utils import rag_helper
 
 class SupervisorAgent(BaseAgent):
     def __init__(self, name: str, model, tokenizer):
@@ -16,14 +17,14 @@ class SupervisorAgent(BaseAgent):
     def should_handle(self, message: str) -> bool:
         return True  # SupervisorAgent handles all messages
 
-    def process(self, message: str, history: List[Dict[str, str]]) -> Dict[str, Any]:
-        selected_agent = self._select_next_agent(message, history)
+    def process(self, message: str, memory) -> Dict[str, Any]:
+        selected_agent = self._select_next_agent(message, memory)
         if selected_agent:
-            return selected_agent.process(message, history)
+            return selected_agent.process(message, memory)
         else:
-            return self._generate_default_response(message)
+            return self._generate_default_response(message, memory)
 
-    def _select_next_agent(self, message: str, history: List[Dict[str, str]]) -> BaseAgent:
+    def _select_next_agent(self, message: str, memory) -> BaseAgent:
         # Check for direct keyword matches
         for keyword, agent in self.agent_keyword_map.items():
             if keyword.lower() in message.lower():
@@ -36,14 +37,36 @@ class SupervisorAgent(BaseAgent):
 
         return None
 
-    def _generate_default_response(self, message: str) -> Dict[str, Any]:
-        system_prompt = (
-            "You are an AI assistant for a hotel. "
-            "Respond to guests politely and efficiently. "
-            "Keep responses concise and professional."
-        )
+    def _generate_default_response(self, message: str, memory) -> Dict[str, Any]:
+        # Get only highly relevant lines with a higher threshold
+        relevant_lines = rag_helper.get_relevant_passages(message, min_score=0.5, k=5)
+        
+        # Only include context if we found relevant information
+        if relevant_lines:
+            # Format the relevant information in a clean, structured way
+            formatted_context = ""
+            for passage, score in relevant_lines:
+                if score > 0.5:  # Only include highly relevant information
+                    formatted_context += f"• {passage.strip()}\n"
+            
+            system_prompt = (
+                "You are an AI assistant for a hotel. "
+                f"The guest has asked: '{message}'\n"
+                "Answer ONLY using these specific details:\n"
+                f"{formatted_context}\n"
+                "Be concise and professional. If you don't have enough information to fully "
+                "answer their question, offer to connect them with the appropriate hotel staff."
+            )
+        else:
+            # No relevant information found, use a generic prompt
+            system_prompt = (
+                "You are an AI assistant for a hotel. "
+                "Respond to guests politely and efficiently. "
+                "Keep responses concise and professional. "
+                "Offer to connect them with hotel staff for detailed information."
+            )
 
-        response = self.generate_response(message, system_prompt)
+        response = self.generate_response(message, memory, system_prompt)
         return self.format_output(response)
 
     def get_keywords(self) -> List[str]:

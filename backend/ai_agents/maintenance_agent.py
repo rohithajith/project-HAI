@@ -3,6 +3,7 @@ import os
 from datetime import datetime, timezone
 from typing import List, Dict, Any
 from .base_agent import BaseAgent, AgentOutput, ToolDefinition
+from .rag_utils import rag_helper
 
 class MaintenanceAgent(BaseAgent):
     def __init__(self, name: str, model, tokenizer):
@@ -14,14 +15,36 @@ class MaintenanceAgent(BaseAgent):
         keywords = ["broken", "repair", "fix", "not working", "schedule maintenance"]
         return any(keyword in message.lower() for keyword in keywords)
 
-    def process(self, message: str, history: List[Dict[str, str]]) -> Dict[str, Any]:
-        system_prompt = (
-            "You are an AI assistant for hotel maintenance. "
-            "Respond to guests politely and efficiently regarding maintenance issues. "
-            "Keep responses concise and professional."
-        )
+    def process(self, message: str, memory) -> Dict[str, Any]:
+        # Get only highly relevant lines with a higher threshold
+        relevant_lines = rag_helper.get_relevant_passages(message, min_score=0.5, k=5)
+        
+        # Only include context if we found relevant information
+        if relevant_lines:
+            # Format the relevant information in a clean, structured way
+            formatted_context = ""
+            for passage, score in relevant_lines:
+                if score > 0.5:  # Only include highly relevant information
+                    formatted_context += f"• {passage.strip()}\n"
+            
+            system_prompt = (
+                "You are an AI assistant for hotel maintenance. "
+                f"The guest has reported: '{message}'\n"
+                "Answer ONLY using these specific details if relevant:\n"
+                f"{formatted_context}\n"
+                "Be concise and professional. Assure them that their maintenance issue "
+                "will be addressed promptly by our maintenance team."
+            )
+        else:
+            # No relevant information found, use a generic prompt
+            system_prompt = (
+                "You are an AI assistant for hotel maintenance. "
+                "Respond to guests politely and efficiently regarding maintenance issues. "
+                "Keep responses concise and professional. "
+                "Assure them that their maintenance issue will be addressed promptly by our maintenance team."
+            )
 
-        response = self.generate_response(message, system_prompt)
+        response = self.generate_response(message, memory, system_prompt)
 
         # Determine the issue type
         if "broken" in message.lower():

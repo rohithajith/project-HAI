@@ -15,27 +15,37 @@ class RoomServiceAgent(BaseAgent):
         keywords = ["room service", "food", "drink", "towel", "order", "burger", "fries", "breakfast", "buffet"]
         return any(keyword in message.lower() for keyword in keywords)
 
-    def process(self, message: str, history: List[Dict[str, str]]) -> Dict[str, Any]:
-        # Check if the message is about breakfast buffet
-        if "breakfast buffet" in message.lower():
-            relevant_passages = rag_helper.get_relevant_passages(message)
-            context = "\n".join([passage for passage, _ in relevant_passages])
+    def process(self, message: str, memory) -> Dict[str, Any]:
+        # Get only highly relevant lines with a higher threshold
+        relevant_lines = rag_helper.get_relevant_passages(message, min_score=0.5, k=5)
+        
+        # Only include context if we found relevant information
+        if relevant_lines:
+            # Format the relevant information in a clean, structured way
+            formatted_context = ""
+            for passage, score in relevant_lines:
+                if score > 0.5:  # Only include highly relevant information
+                    formatted_context += f"• {passage.strip()}\n"
             
             system_prompt = (
                 "You are an AI assistant for hotel room service. "
-                "Use the following context to answer the guest's question about breakfast buffet:\n"
-                f"{context}\n"
-                "Respond to guests politely and efficiently. "
-                "Keep responses concise and professional."
+                f"The guest has asked about: '{message}'\n"
+                "Answer ONLY using these specific details:\n"
+                f"{formatted_context}\n"
+                "Be concise and professional. If you don't have enough information to fully "
+                "answer their question, offer to connect them with our room service team."
             )
         else:
+            # No relevant information found, use a generic prompt
             system_prompt = (
                 "You are an AI assistant for hotel room service. "
                 "Respond to guests politely and efficiently. "
-                "Keep responses concise and professional."
+                "Keep responses concise and professional. "
+                "Our hotel offers 24/7 room service with a variety of food and beverage options. "
+                "Offer to connect them with our room service team for specific menu items and details."
             )
 
-        response = self.generate_response(message, system_prompt)
+        response = self.generate_response(message, memory, system_prompt)
 
         # Check for specific requests and create tool calls
         tool_calls = []

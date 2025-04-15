@@ -3,32 +3,49 @@ import os
 from typing import List, Dict, Any
 from datetime import datetime, timezone
 from .base_agent import BaseAgent, AgentOutput, ToolDefinition
-from .rag_utils import SimpleRAGHelper
+from .rag_utils import rag_helper
 
 class WellnessAgent(BaseAgent):
     def __init__(self, name: str, model, tokenizer):
         super().__init__(name, model, tokenizer)
         self.priority = 2
         self.notifications = []
-        self.rag_helper = SimpleRAGHelper(os.path.join('data', 'hotel_info', 'hotel_information.txt'))
 
     def should_handle(self, message: str) -> bool:
         keywords = ["wellness", "meditation", "yoga", "fitness", "spa", "relax", "massage", "facial", "sauna", "steam room"]
         return any(keyword in message.lower() for keyword in keywords)
 
-    def process(self, message: str, history: List[Dict[str, str]]) -> Dict[str, Any]:
-        relevant_passages = self.rag_helper.get_relevant_passages(message)
-        context = "\n".join([passage for passage, _ in relevant_passages])
+    def process(self, message: str, memory) -> Dict[str, Any]:
+        # Get only highly relevant lines with a higher threshold for spa/wellness queries
+        relevant_lines = rag_helper.get_relevant_passages(message, min_score=0.5, k=5)
+        
+        # Only include context if we found relevant information
+        if relevant_lines:
+            # Format the relevant information in a clean, structured way
+            formatted_context = ""
+            for passage, score in relevant_lines:
+                if score > 0.5:  # Only include highly relevant information
+                    formatted_context += f"• {passage.strip()}\n"
+            
+            system_prompt = (
+                "You are an AI assistant for hotel wellness services. "
+                f"The guest has asked about: '{message}'\n"
+                "Answer ONLY using these specific details:\n"
+                f"{formatted_context}\n"
+                "Be concise and professional. If you don't have enough information to fully "
+                "answer their question, offer to connect them with our wellness team."
+            )
+        else:
+            # No relevant information found, use a generic prompt
+            system_prompt = (
+                "You are an AI assistant for hotel wellness services. "
+                "Respond to guests politely and efficiently regarding spa and wellness services. "
+                "Keep responses concise and professional. "
+                "Our hotel offers spa services including massages, facials, and wellness treatments. "
+                "Offer to connect them with our wellness team for specific details."
+            )
 
-        system_prompt = (
-            "You are an AI assistant for hotel wellness services. "
-            "Use the following context to answer the guest's question about spa and wellness services:\n"
-            f"{context}\n"
-            "Respond to guests politely and efficiently. "
-            "Keep responses concise and professional."
-        )
-
-        response = self.generate_response(message, system_prompt)
+        response = self.generate_response(message, memory, system_prompt)
 
         # Check if the spa is available based on the current time
         spa_available = self.check_spa_availability()
@@ -82,10 +99,35 @@ class WellnessAgent(BaseAgent):
             }
 
     def check_spa_availability(self) -> bool:
-        spa_info = self.rag_helper.get_relevant_passages("Spa opening hours")[0][0]
-        current_time = datetime.now().time()
+        # Get spa hours from the information
+        spa_passages = rag_helper.get_relevant_passages("spa hours opening", min_score=0.4)
+        
+        # Default hours if not found in passages
         opening_time = datetime.strptime("9:00 AM", "%I:%M %p").time()
         closing_time = datetime.strptime("8:00 PM", "%I:%M %p").time()
+        
+        # Try to extract actual hours from passages
+        if spa_passages:
+            for passage, _ in spa_passages:
+                if "spa:" in passage.lower() and "open" in passage.lower():
+                    # Try to extract hours from the passage
+                    try:
+                        hours_text = passage.lower().split("open")[1].split("\n")[0].strip()
+                        if "-" in hours_text:
+                            hours = hours_text.split("-")
+                            opening_str = hours[0].strip()
+                            closing_str = hours[1].strip()
+                            
+                            # Parse times
+                            if "am" in opening_str or "pm" in opening_str:
+                                opening_time = datetime.strptime(opening_str, "%I:%M %p").time()
+                            if "am" in closing_str or "pm" in closing_str:
+                                closing_time = datetime.strptime(closing_str, "%I:%M %p").time()
+                    except:
+                        # If parsing fails, use defaults
+                        pass
+        
+        current_time = datetime.now().time()
         return opening_time <= current_time <= closing_time
 
     def extract_service_type(self, message: str) -> str:

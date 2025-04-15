@@ -1,7 +1,8 @@
 # Dependencies
 node_modules/
 
-
+#converstaions 
+backend/data/conversations/*.json
 # Ignore the virtual environment
 virtual/
 venv/
