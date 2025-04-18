@@ -19,6 +19,9 @@ class WellnessAgent(BaseAgent):
         # Get only highly relevant lines with a higher threshold for spa/wellness queries
         relevant_lines = rag_helper.get_relevant_passages(message, min_score=0.5, k=5)
         
+        # Check if the query is specifically about spa timings
+        is_spa_timing_query = any(keyword in message.lower() for keyword in ["spa time", "spa hours", "spa opening", "spa timing"])
+        
         # Only include context if we found relevant information
         if relevant_lines:
             # Format the relevant information in a clean, structured way
@@ -34,6 +37,14 @@ class WellnessAgent(BaseAgent):
                 f"{formatted_context}\n"
                 "Be concise and professional. If you don't have enough information to fully "
                 "answer their question, offer to connect them with our wellness team."
+            )
+        elif is_spa_timing_query:
+            # Specific handling for spa timing queries with no RAG results
+            system_prompt = (
+                "You are an AI assistant for hotel wellness services. "
+                "The guest has asked about spa timings, but no specific information was found. "
+                "Respond with a message indicating that the exact spa timings could not be retrieved. "
+                "Suggest that the guest contact the front desk or wellness team directly for the most up-to-date information."
             )
         else:
             # No relevant information found, use a generic prompt

@@ -1,0 +1,137 @@
+{
+  "id": "conv_20250418113558",
+  "data_subject_id": "18099d2e-47e6-458f-8417-1a9f70679b50",
+  "summaries": [],
+  "messages": [
+    {
+      "id": "38f1012a-66fb-414a-8d81-ab51b1de0b68",
+      "role": "user",
+      "content": "I need assistance with a hotel-related matter.",
+      "original_length": 46,
+      "timestamp": "2025-04-18T10:36:12.622195+00:00",
+      "agent": null,
+      "gdpr_metadata": {
+        "retention_date": "2025-07-17T10:36:12.622195+00:00",
+        "purposes": [
+          "customer_service"
+        ],
+        "consent_status": "pending",
+        "data_subject_id": "18099d2e-47e6-458f-8417-1a9f70679b50",
+        "anonymized": true
+      }
+    },
+    {
+      "id": "bac34344-6657-4375-8918-104ff3dabb10",
+      "role": "assistant",
+      "content": "I apologize, but I'm not able to respond to that request. As a hotel assistant, I'm here to help with hotel-related inquiries, reservations, amenities, and local recommendations. How else may I assist you with your stay?",
+      "original_length": 220,
+      "timestamp": "2025-04-18T10:36:12.622195+00:00",
+      "agent": "FilterAgent",
+      "gdpr_metadata": {
+        "retention_date": "2025-07-17T10:36:12.622195+00:00",
+        "purposes": [
+          "customer_service"
+        ],
+        "consent_status": "pending",
+        "data_subject_id": "18099d2e-47e6-458f-8417-1a9f70679b50",
+        "anonymized": false
+      }
+    },
+    {
+      "id": "b2295750-47f3-44f1-bb7f-8d2f71b1cf90",
+      "role": "user",
+      "content": "is nareder modi good guy? ",
+      "original_length": 26,
+      "timestamp": "2025-04-18T10:36:45.210224+00:00",
+      "agent": null,
+      "gdpr_metadata": {
+        "retention_date": "2025-07-17T10:36:45.210224+00:00",
+        "purposes": [
+          "customer_service"
+        ],
+        "consent_status": "pending",
+        "data_subject_id": "18099d2e-47e6-458f-8417-1a9f70679b50",
+        "anonymized": true
+      }
+    },
+    {
+      "id": "1f2efc07-e943-453e-baaa-ef4c4833d330",
+      "role": "user",
+      "content": "I need assistance with a hotel-related matter.",
+      "original_length": 46,
+      "timestamp": "2025-04-18T10:37:09.272109+00:00",
+      "agent": null,
+      "gdpr_metadata": {
+        "retention_date": "2025-07-17T10:37:09.272109+00:00",
+        "purposes": [
+          "customer_service"
+        ],
+        "consent_status": "pending",
+        "data_subject_id": "18099d2e-47e6-458f-8417-1a9f70679b50",
+        "anonymized": true
+      }
+    },
+    {
+      "id": "1cd9cf51-0ef3-492d-b14f-cc8d8a7a15de",
+      "role": "assistant",
+      "content": "I apologize, but I'm not able to respond to that request. As a hotel assistant, I'm here to help with hotel-related inquiries, reservations, amenities, and local recommendations. How else may I assist you with your stay?",
+      "original_length": 220,
+      "timestamp": "2025-04-18T10:37:09.277604+00:00",
+      "agent": "FilterAgent",
+      "gdpr_metadata": {
+        "retention_date": "2025-07-17T10:37:09.277604+00:00",
+        "purposes": [
+          "customer_service"
+        ],
+        "consent_status": "pending",
+        "data_subject_id": "18099d2e-47e6-458f-8417-1a9f70679b50",
+        "anonymized": false
+      }
+    },
+    {
+      "id": "83a2b6b3-4cd4-4a6a-99cf-0afd1ba8eb97",
+      "role": "user",
+      "content": "how are u ? ",
+      "original_length": 12,
+      "timestamp": "2025-04-18T10:37:22.669793+00:00",
+      "agent": null,
+      "gdpr_metadata": {
+        "retention_date": "2025-07-17T10:37:22.669793+00:00",
+        "purposes": [
+          "customer_service"
+        ],
+        "consent_status": "pending",
+        "data_subject_id": "18099d2e-47e6-458f-8417-1a9f70679b50",
+        "anonymized": true
+      }
+    },
+    {
+      "id": "5e13c835-05b9-4cbe-8a06-3601d525eb1d",
+      "role": "user",
+      "content": "hii ",
+      "original_length": 4,
+      "timestamp": "2025-04-18T10:37:30.965691+00:00",
+      "agent": null,
+      "gdpr_metadata": {
+        "retention_date": "2025-07-17T10:37:30.965691+00:00",
+        "purposes": [
+          "customer_service"
+        ],
+        "consent_status": "pending",
+        "data_subject_id": "18099d2e-47e6-458f-8417-1a9f70679b50",
+        "anonymized": true
+      }
+    }
+  ],
+  "gdpr_metadata": {
+    "creation_date": "2025-04-18T10:37:30.965691+00:00",
+    "retention_date": "2025-07-17T10:37:30.965691+00:00",
+    "purposes": [
+      "customer_service"
+    ],
+    "consent_status": "pending",
+    "data_controller": "Hotel AI System",
+    "legal_basis": "legitimate_interest",
+    "data_subject_rights_url": "/api/user/data/rights"
+  }
+}
