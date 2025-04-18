@@ -85,3 +85,50 @@ all agents will tackle the input given by suporvisor / agentmanager and produce 
 8.  **Formatting (Post-Processing):** The `OutputFormattingAgent` might be used by the application layer (outside this directory) to format the final `AgentOutput` before sending it to the user/frontend.
 
 Throughout this flow, errors are caught and handled by the `ErrorHandler`, interactions can be logged by `AgentLogger`, and performance is monitored by `MonitoringSystem`. Content safety is checked via `ContentFilter` within the agents.
+
+## Data Protection and Privacy Features
+
+The system implements comprehensive GDPR and LESP (Legal, Ethical, Social, and Privacy) compliance features to ensure proper handling of user data:
+
+### Content Filtering
+
+* **`BaseAgent` (`base_agent.py`):**
+  * Implements `filter_input` and `filter_output` methods to detect and filter offensive, political, or sensitive content
+  * Uses regex pattern matching across three categories: offensive, political, and sensitive
+  * Provides safe alternative responses when content is filtered
+
+* **`AgentManager` (`agent_manager.py`):**
+  * Implements filtering at the entry point before messages are routed to agents
+  * Ensures filtering happens even before agent selection
+  * Filters error messages to prevent sensitive information leakage
+
+### Data Privacy and GDPR Compliance
+
+* **`ConversationMemory` (`conversation_memory.py`):**
+  * Implements personal data anonymization for user messages
+  * Adds GDPR metadata to conversation records (purpose, retention period, consent status)
+  * Provides methods for data subject rights (access, delete, update)
+  * Organizes data storage by date for better retention management
+  * Implements automated data retention with expiration dates
+
+* **`RoomServiceAgent` (`room_service_agent.py`):**
+  * Implements anonymization of personal data in logs
+  * Adds GDPR metadata to logged data
+  * Implements data minimization by only storing necessary fields
+
+* **`DataProtectionManager` (`data_protection.py`):**
+  * Provides automated data cleanup based on retention periods
+  * Implements data protection impact assessment
+  * Maintains records of data processing activities
+  * Runs scheduled tasks for regular cleanup and assessment
+
+### API Endpoints for GDPR Compliance
+
+* **Privacy Notice:** `/api/privacy/notice` - Returns the privacy notice with consent options
+* **Data Access:** `/api/user/data/{conversation_id}` - Allows users to access their data
+* **Data Deletion:** `/api/user/data/{conversation_id}` - Allows users to delete their data
+* **Data Correction:** `/api/user/data/{conversation_id}/{message_id}` - Allows users to correct their data
+* **Consent Management:** `/api/user/consent/{conversation_id}` - Updates user consent preferences
+* **Data Export:** `/api/user/data/export/{conversation_id}` - Exports user data in a portable format
+
+These features ensure the system complies with key GDPR principles while maintaining its functionality.

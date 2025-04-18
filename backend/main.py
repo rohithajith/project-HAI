@@ -1,15 +1,18 @@
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Response, status
 from pydantic import BaseModel
-from typing import List, Dict
+from typing import List, Dict, Optional
 from ai_agents.agent_manager import AgentManager
+from ai_agents.conversation_memory import ConversationMemory
 from datetime import datetime
 import logging
 import uvicorn
 import socket
 import socketio
+import json
 from starlette.routing import Mount
 from starlette.applications import Starlette
+from data_protection import data_protection_manager, start_scheduled_tasks
 
 # -------------------- Logger Setup --------------------
 logging.basicConfig(level=logging.INFO)
@@ -38,6 +41,10 @@ combined_app = Starlette(
     on_startup=[lambda: logger.info("🚀 App mounted!")],
 )
 
+# Start data protection scheduled tasks
+start_scheduled_tasks()
+logger.info("🔒 Data protection tasks initialized")
+
 socket_app = socketio.ASGIApp(sio, other_asgi_app=combined_app)
 
 @app.get("/")
@@ -51,6 +58,13 @@ async def health_check():
 class Message(BaseModel):
     content: str
     history: List[Dict[str, str]] = []
+    
+class ConsentUpdate(BaseModel):
+    status: str  # "granted", "denied", "withdrawn"
+    purposes: Optional[List[str]] = None
+    
+class DataUpdateRequest(BaseModel):
+    content: str
 
 @app.post("/chat")
 async def chat(message: Message):
@@ -119,6 +133,123 @@ async def request_completed(sid, data):
     await sio.emit("guest_response", data)
 
 @sio.event
+# -------------------- GDPR Compliance Endpoints --------------------
+@app.get("/api/privacy/notice")
+async def get_privacy_notice():
+    """Return the privacy notice with consent options"""
+    return {
+        "title": "Privacy Notice",
+        "content": (
+            "This AI assistant collects and processes your conversation data to provide hotel services. "
+            "Your data is anonymized and stored securely. "
+            "You have the right to access, correct, or delete your data at any time. "
+            "We retain conversation data for 90 days after your last interaction. "
+            "For more information, please see our full privacy policy."
+        ),
+        "consent_options": [
+            {"id": "customer_service", "label": "Process data to provide customer service", "required": True},
+            {"id": "service_improvement", "label": "Use data to improve our services", "required": False},
+            {"id": "marketing", "label": "Send personalized offers and promotions", "required": False}
+        ],
+        "buttons": [
+            {"id": "accept_all", "label": "Accept All"},
+            {"id": "accept_required", "label": "Accept Only Required"},
+            {"id": "reject_all", "label": "Reject All"}
+        ]
+    }
+
+@app.get("/api/user/data/{conversation_id}")
+async def get_user_data(conversation_id: str):
+    """Allow users to access their data (Right of Access)"""
+    memory = ConversationMemory()
+    if memory.load_conversation(conversation_id):
+        # Return the conversation data
+        return {
+            "conversation_id": memory.conversation_id,
+            "messages": memory.conversation_history,
+            "gdpr_metadata": {
+                "purposes": memory.data_purposes,
+                "consent_status": memory.consent_status,
+                "retention_period": memory.retention_period
+            }
+        }
+    raise HTTPException(status_code=404, detail="Conversation not found")
+
+@app.delete("/api/user/data/{conversation_id}")
+async def delete_user_data(conversation_id: str):
+    """Allow users to delete their data (Right to Erasure)"""
+    memory = ConversationMemory()
+    if memory.load_conversation(conversation_id):
+        if memory.delete_data():
+            return {"status": "Data deleted successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to delete data")
+    raise HTTPException(status_code=404, detail="Conversation not found")
+
+@app.put("/api/user/data/{conversation_id}/{message_id}")
+async def update_user_data(conversation_id: str, message_id: str, update: DataUpdateRequest):
+    """Allow users to correct their data (Right to Rectification)"""
+    memory = ConversationMemory()
+    if memory.load_conversation(conversation_id):
+        # Find and update the specific message
+        for message in memory.conversation_history:
+            if message.get("id") == message_id:
+                # Only allow updating user messages
+                if message.get("role") == "user":
+                    # Anonymize the new content
+                    anonymized_content = memory._anonymize_personal_data(update.content)
+                    message["content"] = anonymized_content
+                    message["updated_at"] = datetime.now().isoformat()
+                    # Save the updated conversation
+                    memory._save_conversation()
+                    return {"status": "Data updated successfully"}
+                else:
+                    raise HTTPException(status_code=403, detail="Can only update user messages")
+        raise HTTPException(status_code=404, detail="Message not found")
+    raise HTTPException(status_code=404, detail="Conversation not found")
+
+@app.post("/api/user/consent/{conversation_id}")
+async def update_consent(conversation_id: str, consent: ConsentUpdate):
+    """Update user consent preferences"""
+    memory = ConversationMemory()
+    if memory.load_conversation(conversation_id):
+        if memory.update_consent(consent.status, consent.purposes):
+            return {"status": "Consent updated successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to update consent")
+    raise HTTPException(status_code=404, detail="Conversation not found")
+
+@app.get("/api/user/data/export/{conversation_id}")
+async def export_user_data(conversation_id: str):
+    """Export all user data in a portable format (Right to Data Portability)"""
+    memory = ConversationMemory()
+    if memory.load_conversation(conversation_id):
+        # Create a portable format (JSON)
+        portable_data = {
+            "conversation_id": memory.conversation_id,
+            "created_at": next((msg.get("timestamp") for msg in memory.conversation_history if msg), None),
+            "messages": [
+                {
+                    "role": msg.get("role"),
+                    "content": msg.get("content"),
+                    "timestamp": msg.get("timestamp")
+                }
+                for msg in memory.conversation_history
+                if msg.get("role") == "user"  # Only include user messages
+            ]
+        }
+        
+        # Set response headers for file download
+        headers = {
+            'Content-Disposition': f'attachment; filename="conversation_{conversation_id}.json"'
+        }
+        
+        return Response(
+            content=json.dumps(portable_data, indent=2),
+            media_type="application/json",
+            headers=headers
+        )
+    raise HTTPException(status_code=404, detail="Conversation not found")
 async def rating_feedback(sid, data):
     logger.info(f"⭐ Rating received: {data}")
     await sio.emit("rating_feedback", data)
