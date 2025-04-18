@@ -7,6 +7,8 @@ from .supervisor_agent import SupervisorAgent
 from .room_service_agent import RoomServiceAgent
 from .maintenance_agent import MaintenanceAgent
 from .wellness_agent import WellnessAgent
+from .service_booking_agent import ServiceBookingAgent
+from .checkin_agent import CheckInAgent
 from .conversation_memory import ConversationMemory
 from datetime import datetime, timezone
 import os
@@ -17,10 +19,14 @@ class AgentManager:
         self.room_service_agent = RoomServiceAgent("RoomServiceAgent", self.model, self.tokenizer)
         self.maintenance_agent = MaintenanceAgent("MaintenanceAgent", self.model, self.tokenizer)
         self.wellness_agent = WellnessAgent("WellnessAgent", self.model, self.tokenizer)
+        self.service_booking_agent = ServiceBookingAgent("ServiceBookingAgent", self.model, self.tokenizer)
+        self.checkin_agent = CheckInAgent("CheckInAgent", self.model, self.tokenizer)
         
         self.supervisor.register_agent(self.room_service_agent)
         self.supervisor.register_agent(self.maintenance_agent)
         self.supervisor.register_agent(self.wellness_agent)
+        self.supervisor.register_agent(self.service_booking_agent)
+        self.supervisor.register_agent(self.checkin_agent)
         
         # Initialize conversation memory
         self.memory = ConversationMemory()

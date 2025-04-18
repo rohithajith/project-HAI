@@ -193,3 +193,18 @@ Consent management: Tracking and respecting user consent preferences
 Data security: Anonymizing personal data and implementing access controls
 Data processing records: Keeping records of data processing activities
 Data protection impact assessment: Assessing risks to user rights and freedoms
+
+
+# added checkin_agent 
+Check-in Agent Enhanced with Stay Extension Feature:
+
+Key Additions:
+
+Implemented _handle_extend_stay() method for checking room availability
+Added dynamic room availability checking logic
+Enhanced keyword detection for stay extension requests
+Features:
+
+Check booking details by ID
+Validate room availability for stay extension
+Provide contextual responses based on room availability
