@@ -60,7 +60,8 @@ async def chat(message: Message):
         return response
     except Exception as e:
         logger.error(f"REST Error: {e}", exc_info=True)
-        return {"response": f"Error: {str(e)}", "agent": "ErrorHandler"}
+        # Use agent_manager's handle_error method which includes filtering
+        return agent_manager.handle_error(e)
 
 @sio.event
 async def connect(sid, environ):
@@ -98,11 +99,13 @@ async def guest_message(sid, data):
 
     except Exception as e:
         logger.error(f"Socket Error: {e}", exc_info=True)
+        # Use agent_manager's handle_error method which includes filtering
+        error_response = agent_manager.handle_error(e)
         await sio.emit("guest_response", {
-            "response": f"Error occurred: {str(e)}",
-            "tool_calls": [],
-            "timestamp": "",
-            "agent": "ErrorHandler",
+            "response": error_response["response"],
+            "tool_calls": error_response["tool_calls"],
+            "timestamp": error_response["timestamp"],
+            "agent": error_response["agent"],
             "room": data.get("room", "unknown"),
             "type": "Error",
             "status": "Error",
