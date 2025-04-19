@@ -1,3 +1,9 @@
+"""
+aim of the agent: Manages room service orders and requests.
+inputs of agent: User message, order details.
+output json of the agent: Order confirmation or status.
+method: Processes orders and updates inventory.
+"""
 import json
 import os
 import re

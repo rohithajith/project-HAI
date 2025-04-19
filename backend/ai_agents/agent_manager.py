@@ -1,3 +1,9 @@
+"""
+aim of the agent: Manages interactions between different agents and routes user requests.
+inputs of agent: User message (str), conversation history (List[Dict[str, str]]).
+output json of the agent: Dictionary containing response, tool calls, timestamp, and agent name.
+method: Filters input, detects SOS, uses fast paths for common requests, or routes via supervisor.
+"""
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from typing import List, Dict, Any, Tuple
@@ -10,8 +16,10 @@ from .wellness_agent import WellnessAgent
 from .service_booking_agent import ServiceBookingAgent
 from .checkin_agent import CheckInAgent
 from .conversation_memory import ConversationMemory
+from .sos_agent import SOSAgent  # New import for SOS handling
 from datetime import datetime, timezone
 import os
+
 class AgentManager:
     def __init__(self):
         self.model, self.tokenizer = self.load_model()
@@ -21,12 +29,14 @@ class AgentManager:
         self.wellness_agent = WellnessAgent("WellnessAgent", self.model, self.tokenizer)
         self.service_booking_agent = ServiceBookingAgent("ServiceBookingAgent", self.model, self.tokenizer)
         self.checkin_agent = CheckInAgent("CheckInAgent", self.model, self.tokenizer)
+        self.sos_agent = SOSAgent("SOSAgent", self.model, self.tokenizer)  # Add SOS Agent
         
         self.supervisor.register_agent(self.room_service_agent)
         self.supervisor.register_agent(self.maintenance_agent)
         self.supervisor.register_agent(self.wellness_agent)
         self.supervisor.register_agent(self.service_booking_agent)
         self.supervisor.register_agent(self.checkin_agent)
+        self.supervisor.register_agent(self.sos_agent)  # Register SOS Agent
         
         # Initialize conversation memory
         self.memory = ConversationMemory()
@@ -127,6 +137,19 @@ class AgentManager:
         
         # Add user message to memory
         self.memory.add_message("user", message)
+        
+        # SOS Emergency Detection - Highest Priority
+        sos_keywords = [
+            "fire", "emergency", "help", "panic attack", 
+            "medical help", "urgent", "danger", "hurt", 
+            "bleeding", "choking", "unconscious", 
+            "need assistance", "sos", "critical"
+        ]
+        if any(keyword in message.lower() for keyword in sos_keywords):
+            response = self.sos_agent.process(message, self.memory)
+            # Add SOS response to memory
+            self.memory.add_message("assistant", response["response"], "SOSAgent")
+            return response
         
         # Fast path for room service requests
         room_service_keywords = ["towel", "food", "drink", "order", "burger", "fries"]

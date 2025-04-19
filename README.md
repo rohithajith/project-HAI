@@ -41,11 +41,6 @@ all agents will tackle the input given by suporvisor / agentmanager and produce 
     *   **Keywords:** "broken", "repair", "fix", "not working", "schedule maintenance".
     *   **Tools:** `report_issue`, `schedule_maintenance`.
     *   **Notes:** Use notification [] array and add the notification into it everytiime its called / service to report issues.
-*   **`PromotionAgent` (`promotion_agent.py`):**
-    *   **Purpose:** Informs guests about promotions like theme nights and happy hours.
-    *   **Keywords:** "promotion", "theme night", "happy hour", "deal", "discount", "events".
-    *   **Tools:** `add_promotional_content`, `query_promotions`.
-    *   **Notes:** Utilizes Retrieval-Augmented Generation (RAG) with embeddings to query relevant promotional information availble in data\policy.txt.
 *   **`RoomServiceAgent` (`room_service_agent.py`):**
     *   **Purpose:** Handles requests for room service (food, drinks, towels, amenities).
     *   **Keywords:** "room service", "food", "drink", "towel", "order", "burger", "fries".

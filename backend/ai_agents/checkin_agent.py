@@ -1,3 +1,9 @@
+"""
+aim of the agent: Manages guest check-ins and booking confirmations.
+inputs of agent: User message, booking ID.
+output json of the agent: Check-in confirmation or error details.
+method: Validates booking ID and processes check-in.
+"""
 from typing import List, Dict, Any
 import sqlite3
 import os

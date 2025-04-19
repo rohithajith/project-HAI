@@ -1,3 +1,9 @@
+"""
+aim of the agent: Routes requests to appropriate agents.
+inputs of agent: User message, conversation history.
+output json of the agent: Response from the selected agent.
+method: Uses keyword matching to select agents.
+"""
 from typing import List, Dict, Any
 from .base_agent import BaseAgent, AgentOutput
 from .rag_utils import rag_helper

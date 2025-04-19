@@ -1,3 +1,9 @@
+"""
+aim of the agent: Manages wellness services like spa and meditation.
+inputs of agent: User message, service type.
+output json of the agent: Service availability or booking status.
+method: Checks schedules and confirms bookings.
+"""
 import json
 import os
 from typing import List, Dict, Any

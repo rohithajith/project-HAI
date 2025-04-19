@@ -32,7 +32,20 @@ class BaseAgent(ABC):
     def get_available_tools(self) -> List[ToolDefinition]:
         return []
 
+    def get_keywords(self) -> List[str]:
+        """
+        Default implementation returns an empty list of keywords.
+        Agents should override this method to provide their specific keywords.
+        """
+        return []
+
     def handle_tool_call(self, tool_name: str, **kwargs) -> Any:
+        if tool_name == "notify_admin_dashboard":
+            # Log emergency details to a file or send to admin dashboard
+            emergency_details = kwargs.get('emergency_details', {})
+            print(f"EMERGENCY NOTIFICATION: {emergency_details}")
+            return {"status": "success", "message": "Admin dashboard notified"}
+        
         raise NotImplementedError(f"Tool '{tool_name}' not implemented for {self.name}")
 
     def format_output(self, response: str, tool_calls: List[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -42,6 +55,7 @@ class BaseAgent(ABC):
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "agent": self.name
         }
+
     def filter_input(self, user_input: str) -> Tuple[str, bool]:
         """
         Filter user input to prevent offensive, political, or sensitive content.
@@ -88,7 +102,7 @@ class BaseAgent(ABC):
         
         # No issues found, return original input
         return user_input, False
-    
+
     def filter_output(self, model_output: str) -> Tuple[str, bool]:
         """
         Filter model output to prevent offensive, political, or sensitive content.

@@ -208,3 +208,23 @@ Features:
 Check booking details by ID
 Validate room availability for stay extension
 Provide contextual responses based on room availability
+
+# added sos emergency 
+BaseAgent now provides a default empty implementation of get_keywords()
+Added a default handler for the notify_admin_dashboard tool
+Kept the existing emergency detection and routing logic
+The system can now:
+
+Detect emergency keywords
+Classify emergency types
+Notify the admin dashboard
+Provide an immediate response to the guest
+Emergency Detection Workflow:
+
+User sends an SOS-related message
+AgentManager detects emergency keywords
+SOSAgent processes the request
+Emergency metadata is generated
+Admin dashboard is notified
+Guest receives an immediate, reassuring response
+The implementation supports various emergency types, including fire, medical emergencies, mental health crises, and personal safety concerns.

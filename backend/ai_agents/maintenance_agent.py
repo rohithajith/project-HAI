@@ -1,3 +1,9 @@
+"""
+aim of the agent: Handles maintenance requests and schedules repairs.
+inputs of agent: User message, issue description.
+output json of the agent: Maintenance request confirmation or status.
+method: Logs issues and notifies maintenance staff.
+"""
 import json
 import os
 from datetime import datetime, timezone
