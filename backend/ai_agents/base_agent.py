@@ -213,4 +213,5 @@ class BaseAgent(ABC):
             fallback_response = full_response
             # Still filter the fallback response
             filtered_fallback, _ = self.filter_output(fallback_response)
+            return filtered_fallbackelf.filter_output(fallback_response)
             return filtered_fallback
