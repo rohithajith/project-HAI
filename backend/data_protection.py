@@ -90,7 +90,7 @@ class DataProtectionManager:
         })
         
         return expired_count
-    
+        
     def _cleanup_empty_directories(self, root_dir):
         """Remove empty directories recursively"""
         for dirpath, dirnames, filenames in os.walk(root_dir, topdown=False):

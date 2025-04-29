@@ -1,0 +1,35 @@
+{
+  "id": "conv_20250429235747",
+  "data_subject_id": "f31b1885-1e68-45ee-abe2-0bf4eab12434",
+  "summaries": [],
+  "messages": [
+    {
+      "id": "a36f721b-d8db-4642-b911-4567efd0229a",
+      "role": "user",
+      "content": "I need room service",
+      "original_length": 19,
+      "timestamp": "2025-04-29T22:57:47.147598+00:00",
+      "agent": null,
+      "gdpr_metadata": {
+        "retention_date": "2025-07-28T22:57:47.147598+00:00",
+        "purposes": [
+          "customer_service"
+        ],
+        "consent_status": "pending",
+        "data_subject_id": "f31b1885-1e68-45ee-abe2-0bf4eab12434",
+        "anonymized": true
+      }
+    }
+  ],
+  "gdpr_metadata": {
+    "creation_date": "2025-04-29T22:57:47.154010+00:00",
+    "retention_date": "2025-07-28T22:57:47.154010+00:00",
+    "purposes": [
+      "customer_service"
+    ],
+    "consent_status": "pending",
+    "data_controller": "Hotel AI System",
+    "legal_basis": "legitimate_interest",
+    "data_subject_rights_url": "/api/user/data/rights"
+  }
+}

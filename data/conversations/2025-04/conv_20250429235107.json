@@ -1,0 +1,120 @@
+{
+  "id": "conv_20250429235107",
+  "data_subject_id": "6de3e12d-5eb0-43fa-9ca2-6c377f2a0730",
+  "summaries": [],
+  "messages": [
+    {
+      "id": "eb93c480-a39c-4be7-9fa6-98620261eaa5",
+      "role": "user",
+      "content": "I need room service",
+      "original_length": 19,
+      "timestamp": "2025-04-29T22:51:07.491318+00:00",
+      "agent": null,
+      "gdpr_metadata": {
+        "retention_date": "2025-07-28T22:51:07.491318+00:00",
+        "purposes": [
+          "customer_service"
+        ],
+        "consent_status": "pending",
+        "data_subject_id": "6de3e12d-5eb0-43fa-9ca2-6c377f2a0730",
+        "anonymized": true
+      }
+    },
+    {
+      "id": "ed1ee910-90d9-4646-85ad-77cc5e1b7c85",
+      "role": "assistant",
+      "content": "Our room service team will attend to your request immediately. Can I provide you with a menu or would you like me to guide you through the options?",
+      "original_length": 147,
+      "timestamp": "2025-04-29T22:51:09.705325+00:00",
+      "agent": "RoomServiceAgent",
+      "gdpr_metadata": {
+        "retention_date": "2025-07-28T22:51:09.705325+00:00",
+        "purposes": [
+          "customer_service"
+        ],
+        "consent_status": "pending",
+        "data_subject_id": "6de3e12d-5eb0-43fa-9ca2-6c377f2a0730",
+        "anonymized": false
+      }
+    },
+    {
+      "id": "2059cb58-1ebb-4462-9793-bbed92ee6db3",
+      "role": "user",
+      "content": "Emergency help!",
+      "original_length": 15,
+      "timestamp": "2025-04-29T22:51:09.705325+00:00",
+      "agent": null,
+      "gdpr_metadata": {
+        "retention_date": "2025-07-28T22:51:09.705325+00:00",
+        "purposes": [
+          "customer_service"
+        ],
+        "consent_status": "pending",
+        "data_subject_id": "6de3e12d-5eb0-43fa-9ca2-6c377f2a0730",
+        "anonymized": true
+      }
+    },
+    {
+      "id": "1136adad-1c8b-443e-be9a-dda55a71649a",
+      "role": "assistant",
+      "content": "EMERGENCY ALERT: Our staff has been notified and will respond immediately. Please stay calm and follow any immediate safety instructions. Help is on the way.",
+      "original_length": 157,
+      "timestamp": "2025-04-29T22:51:09.705325+00:00",
+      "agent": "SOSAgent",
+      "gdpr_metadata": {
+        "retention_date": "2025-07-28T22:51:09.705325+00:00",
+        "purposes": [
+          "customer_service"
+        ],
+        "consent_status": "pending",
+        "data_subject_id": "6de3e12d-5eb0-43fa-9ca2-6c377f2a0730",
+        "anonymized": false
+      }
+    },
+    {
+      "id": "4f52405e-714a-4a60-a034-509107fbe94a",
+      "role": "user",
+      "content": "Book a spa session",
+      "original_length": 18,
+      "timestamp": "2025-04-29T22:51:09.705325+00:00",
+      "agent": null,
+      "gdpr_metadata": {
+        "retention_date": "2025-07-28T22:51:09.705325+00:00",
+        "purposes": [
+          "customer_service"
+        ],
+        "consent_status": "pending",
+        "data_subject_id": "6de3e12d-5eb0-43fa-9ca2-6c377f2a0730",
+        "anonymized": true
+      }
+    },
+    {
+      "id": "1846e882-24e3-4109-a732-d4abde285d65",
+      "role": "assistant",
+      "content": "We're happy to accommodate your desire to relax at our full-service spa! We recommend booking in advance as appointments fill up quickly. Would you prefer a massage, facial, or other body treatment? Additionally, do you have any specific preferences such as time of day or preferred therapist?\n\nAlternatively, if you'd rather not choose today, we can also assist you with making a reservation for another date that suits your schedule better. How may I further assist you with planning your spa experience?",
+      "original_length": 506,
+      "timestamp": "2025-04-29T22:51:15.025172+00:00",
+      "agent": "WellnessAgent",
+      "gdpr_metadata": {
+        "retention_date": "2025-07-28T22:51:15.025172+00:00",
+        "purposes": [
+          "customer_service"
+        ],
+        "consent_status": "pending",
+        "data_subject_id": "6de3e12d-5eb0-43fa-9ca2-6c377f2a0730",
+        "anonymized": false
+      }
+    }
+  ],
+  "gdpr_metadata": {
+    "creation_date": "2025-04-29T22:51:15.025172+00:00",
+    "retention_date": "2025-07-28T22:51:15.025172+00:00",
+    "purposes": [
+      "customer_service"
+    ],
+    "consent_status": "pending",
+    "data_controller": "Hotel AI System",
+    "legal_basis": "legitimate_interest",
+    "data_subject_rights_url": "/api/user/data/rights"
+  }
+}

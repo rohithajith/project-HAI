@@ -1,0 +1,52 @@
+{
+  "id": "conv_20250429234849",
+  "data_subject_id": "f99dc76f-0bf0-46f3-a3bb-6c053c24ffdd",
+  "summaries": [],
+  "messages": [
+    {
+      "id": "4f89ec09-6ef3-404c-b633-fe6e1c783b75",
+      "role": "user",
+      "content": "I need room service",
+      "original_length": 19,
+      "timestamp": "2025-04-29T22:48:49.331142+00:00",
+      "agent": null,
+      "gdpr_metadata": {
+        "retention_date": "2025-07-28T22:48:49.331142+00:00",
+        "purposes": [
+          "customer_service"
+        ],
+        "consent_status": "pending",
+        "data_subject_id": "f99dc76f-0bf0-46f3-a3bb-6c053c24ffdd",
+        "anonymized": true
+      }
+    },
+    {
+      "id": "41eab363-2fe5-4e87-93a8-1d75cdf198cb",
+      "role": "assistant",
+      "content": "We're happy to assist you! Our room service menu features a wide selection of options to satisfy your cravings at all hours. Would you like me to send over the menu? We also require that pets remain in crates during delivery to ensure both safety and comfort for everyone involved. Additionally, please note that some spa services include access to our steam room or sauna upon completion of treatment. Is there anything else I can help you with regarding your order?",
+      "original_length": 467,
+      "timestamp": "2025-04-29T22:48:55.098885+00:00",
+      "agent": "RoomServiceAgent",
+      "gdpr_metadata": {
+        "retention_date": "2025-07-28T22:48:55.098885+00:00",
+        "purposes": [
+          "customer_service"
+        ],
+        "consent_status": "pending",
+        "data_subject_id": "f99dc76f-0bf0-46f3-a3bb-6c053c24ffdd",
+        "anonymized": false
+      }
+    }
+  ],
+  "gdpr_metadata": {
+    "creation_date": "2025-04-29T22:48:55.098885+00:00",
+    "retention_date": "2025-07-28T22:48:55.098885+00:00",
+    "purposes": [
+      "customer_service"
+    ],
+    "consent_status": "pending",
+    "data_controller": "Hotel AI System",
+    "legal_basis": "legitimate_interest",
+    "data_subject_rights_url": "/api/user/data/rights"
+  }
+}

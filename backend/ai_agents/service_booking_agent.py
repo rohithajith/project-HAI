@@ -1,14 +1,13 @@
-
-
-from typing import List, Dict, Any
-import os
-import re
 """
 aim of the agent: Manages service bookings like spa and gym sessions.
 inputs of agent: User message, service type, time slot.
 output json of the agent: Booking confirmation or availability status.
 method: Checks availability and confirms bookings.
 """
+
+from typing import List, Dict, Any
+import os
+import re
 import json
 from datetime import datetime, timedelta
 from .base_agent import BaseAgent

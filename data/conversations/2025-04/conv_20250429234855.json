@@ -1,0 +1,52 @@
+{
+  "id": "conv_20250429234855",
+  "data_subject_id": "feb75738-c51c-448c-8a95-bebced2b8095",
+  "summaries": [],
+  "messages": [
+    {
+      "id": "1142bb50-5cdc-45dc-95bc-eb4b909a72cd",
+      "role": "user",
+      "content": "Hello, I need help",
+      "original_length": 18,
+      "timestamp": "2025-04-29T22:48:55.113464+00:00",
+      "agent": null,
+      "gdpr_metadata": {
+        "retention_date": "2025-07-28T22:48:55.113464+00:00",
+        "purposes": [
+          "customer_service"
+        ],
+        "consent_status": "pending",
+        "data_subject_id": "feb75738-c51c-448c-8a95-bebced2b8095",
+        "anonymized": true
+      }
+    },
+    {
+      "id": "b275be9c-d70e-47df-98b7-afea6a9bf5cc",
+      "role": "assistant",
+      "content": "How can I assist you?",
+      "original_length": 21,
+      "timestamp": "2025-04-29T22:48:55.113464+00:00",
+      "agent": "SupervisorAgent",
+      "gdpr_metadata": {
+        "retention_date": "2025-07-28T22:48:55.113464+00:00",
+        "purposes": [
+          "customer_service"
+        ],
+        "consent_status": "pending",
+        "data_subject_id": "feb75738-c51c-448c-8a95-bebced2b8095",
+        "anonymized": false
+      }
+    }
+  ],
+  "gdpr_metadata": {
+    "creation_date": "2025-04-29T22:48:55.113464+00:00",
+    "retention_date": "2025-07-28T22:48:55.113464+00:00",
+    "purposes": [
+      "customer_service"
+    ],
+    "consent_status": "pending",
+    "data_controller": "Hotel AI System",
+    "legal_basis": "legitimate_interest",
+    "data_subject_rights_url": "/api/user/data/rights"
+  }
+}
