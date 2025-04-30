@@ -8,8 +8,8 @@ import json
 import os
 import re
 from typing import List, Dict, Any
-from .base_agent import BaseAgent, AgentOutput, ToolDefinition
 from datetime import datetime, timezone, timedelta
+from .base_agent import BaseAgent, AgentOutput, ToolDefinition
 from .rag_utils import rag_helper
 
 class RoomServiceAgent(BaseAgent):
@@ -54,21 +54,32 @@ class RoomServiceAgent(BaseAgent):
 
         response = self.generate_response(message, memory, system_prompt)
 
-        # Check for specific requests and create tool calls
+        # Prepare tool calls
         tool_calls = []
+        
+        # Check for specific service requests
         if "towel" in message.lower():
             tool_calls.append({
-                "type": "towel_request",
-                "request_type": "towels",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "agent": self.name
+                "tool_name": "place_order",
+                "parameters": {
+                    "item_type": "towels",
+                    "quantity": 1
+                }
             })
-        elif any(food in message.lower() for food in ["food", "burger", "fries"]):
+        elif any(food in message.lower() for food in ["food", "burger", "fries", "order"]):
             tool_calls.append({
-                "type": "food_order",
-                "request_type": "food",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "agent": self.name
+                "tool_name": "place_order",
+                "parameters": {
+                    "item_type": "food",
+                    "details": message
+                }
+            })
+        
+        # If no specific tool calls, add a generic check availability call
+        if not tool_calls:
+            tool_calls.append({
+                "tool_name": "check_menu_availability",
+                "parameters": {}
             })
 
         # Add notifications
@@ -97,10 +108,19 @@ class RoomServiceAgent(BaseAgent):
     def handle_tool_call(self, tool_name: str, **kwargs) -> Any:
         if tool_name == "check_menu_availability":
             # Implement menu availability check logic here
-            return True
+            return {
+                "available_items": ["towels", "breakfast", "burger", "fries"],
+                "status": "available"
+            }
         elif tool_name == "place_order":
             # Implement order placement logic here
-            return {"order_id": "12345", "status": "placed"}
+            order_details = {
+                "order_id": f"RS-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+                "status": "placed",
+                "item_type": kwargs.get('item_type', 'unknown'),
+                "details": kwargs.get('details', '')
+            }
+            return order_details
         else:
             return super().handle_tool_call(tool_name, **kwargs)
 

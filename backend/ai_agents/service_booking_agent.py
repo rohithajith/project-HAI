@@ -1,5 +1,3 @@
-
-
 from typing import List, Dict, Any
 import os
 import re
@@ -11,7 +9,7 @@ method: Checks availability and confirms bookings.
 """
 import json
 from datetime import datetime, timedelta
-from .base_agent import BaseAgent
+from .base_agent import BaseAgent, ToolDefinition
 from .rag_utils import rag_helper
 
 class ServiceBookingAgent(BaseAgent):
@@ -44,6 +42,19 @@ class ServiceBookingAgent(BaseAgent):
         return [
             'spa', 'gym', 'meditation', 'book service', 
             'wellness', 'book room', 'session'
+        ]
+
+    def get_available_tools(self) -> List[ToolDefinition]:
+        """Define available tools for the ServiceBookingAgent"""
+        return [
+            ToolDefinition(
+                name="check_menu_availability", 
+                description="Check availability of a specific service or time slot"
+            ),
+            ToolDefinition(
+                name="place_order", 
+                description="Book a specific service at a given time"
+            )
         ]
 
     def should_handle(self, message: str) -> bool:
@@ -79,6 +90,34 @@ class ServiceBookingAgent(BaseAgent):
             return False
         
         return time_slot.lower() in self.services[service]['available_slots']
+
+    def handle_tool_call(self, tool_name: str, **kwargs) -> Any:
+        """Handle specific tool calls for the ServiceBookingAgent"""
+        if tool_name == "check_menu_availability":
+            item = kwargs.get('item', '')
+            if item.lower() in self.services:
+                return {
+                    "available_slots": self.services[item.lower()]['available_slots'],
+                    "max_capacity": self.services[item.lower()]['max_capacity']
+                }
+            return {"error": "Service not found"}
+        
+        elif tool_name == "place_order":
+            service = kwargs.get('service', '')
+            time = kwargs.get('time', '')
+            
+            if self._check_service_availability(service, time):
+                booking_details = {
+                    "service": service,
+                    "time_slot": time,
+                    "duration": self.services[service.lower()]['duration'],
+                    "booking_id": self._generate_booking_id(),
+                    "timestamp": datetime.now().isoformat()
+                }
+                return booking_details
+            return {"error": "Service or time slot not available"}
+        
+        raise NotImplementedError(f"Tool '{tool_name}' not implemented for ServiceBookingAgent")
 
     def process(self, message: str, memory) -> Dict[str, Any]:
         # Normalize message
@@ -121,7 +160,16 @@ class ServiceBookingAgent(BaseAgent):
                 return {
                     "response": f"Your {service} session at {time_slot} has been booked successfully!",
                     "booking_details": booking_details,
-                    "agent": "ServiceBookingAgent"
+                    "agent": "ServiceBookingAgent",
+                    "tool_calls": [
+                        {
+                            "tool_name": "place_order",
+                            "parameters": {
+                                "service": service,
+                                "time": time_slot
+                            }
+                        }
+                    ]
                 }
             else:
                 return self.format_output(

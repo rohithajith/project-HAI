@@ -6,6 +6,7 @@ method: Logs issues and notifies maintenance staff.
 """
 import json
 import os
+import re
 from datetime import datetime, timezone
 from typing import List, Dict, Any
 from .base_agent import BaseAgent, AgentOutput, ToolDefinition
@@ -52,13 +53,44 @@ class MaintenanceAgent(BaseAgent):
 
         response = self.generate_response(message, memory, system_prompt)
 
-        # Determine the issue type
+        # Prepare tool calls
+        tool_calls = []
+
+        # Determine the issue type and create appropriate tool calls
         if "broken" in message.lower():
             issue_type = "repair"
+            tool_calls.append({
+                "tool_name": "report_issue",
+                "parameters": {
+                    "issue_type": "repair",
+                    "description": message
+                }
+            })
         elif "not working" in message.lower():
             issue_type = "malfunction"
+            tool_calls.append({
+                "tool_name": "report_issue",
+                "parameters": {
+                    "issue_type": "malfunction",
+                    "description": message
+                }
+            })
         else:
             issue_type = "general maintenance"
+            tool_calls.append({
+                "tool_name": "schedule_maintenance",
+                "parameters": {
+                    "issue_type": "general maintenance",
+                    "description": message
+                }
+            })
+
+        # If no specific tool calls were generated, add a generic check
+        if not tool_calls:
+            tool_calls.append({
+                "tool_name": "check_maintenance_status",
+                "parameters": {}
+            })
 
         # Create a notification
         notification = {
@@ -75,25 +107,45 @@ class MaintenanceAgent(BaseAgent):
             "input": message,
             "response": response,
             "notification": notification,
+            "tool_calls": tool_calls,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "agent": self.name
         })
 
-        return self.format_output(response, [notification])
+        return self.format_output(response, tool_calls)
 
     def get_available_tools(self) -> List[ToolDefinition]:
         return [
             ToolDefinition("report_issue", "Report a maintenance issue"),
-            ToolDefinition("schedule_maintenance", "Schedule a maintenance appointment")
+            ToolDefinition("schedule_maintenance", "Schedule a maintenance appointment"),
+            ToolDefinition("check_maintenance_status", "Check the status of maintenance requests")
         ]
 
     def handle_tool_call(self, tool_name: str, **kwargs) -> Any:
         if tool_name == "report_issue":
             # Implement issue reporting logic here
-            return {"issue_id": "M12345", "status": "reported"}
+            issue_details = {
+                "issue_id": f"MAINT-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+                "status": "reported",
+                "issue_type": kwargs.get('issue_type', 'unspecified'),
+                "description": kwargs.get('description', '')
+            }
+            return issue_details
         elif tool_name == "schedule_maintenance":
             # Implement maintenance scheduling logic here
-            return {"appointment_id": "A67890", "status": "scheduled"}
+            appointment_details = {
+                "appointment_id": f"APPT-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+                "status": "scheduled",
+                "issue_type": kwargs.get('issue_type', 'general maintenance'),
+                "description": kwargs.get('description', '')
+            }
+            return appointment_details
+        elif tool_name == "check_maintenance_status":
+            # Implement maintenance status check logic
+            return {
+                "status": "no_active_requests",
+                "message": "No current maintenance requests found."
+            }
         else:
             return super().handle_tool_call(tool_name, **kwargs)
 
@@ -103,7 +155,7 @@ class MaintenanceAgent(BaseAgent):
     def _save_to_log(self, data: Dict[str, Any]):
         log_dir = os.path.join("logs", "maintenance")
         os.makedirs(log_dir, exist_ok=True)
-        log_file = os.path.join(log_dir, f"maintenance_log_{datetime.now().strftime('%Y%m%d')}.json")
+        log_file = os.path.join(log_dir, f"maintenance_log_{datetime.now().strftime('%Y%m%d')}.jsonl")
         
         with open(log_file, "a") as f:
             json.dump(data, f)

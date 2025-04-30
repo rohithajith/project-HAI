@@ -178,7 +178,10 @@ class AgentManager:
         # Default path: use supervisor to route the request
         response = self.supervisor.process(message, self.memory)
         # Add assistant response to memory
-        self.memory.add_message("assistant", response["response"], response["agent"])
+        self.memory.add_message("assistant", response["response"], response.get("agent", "SupervisorAgent"))
+        # Ensure tool_calls is always a list
+        if "tool_calls" not in response:
+            response["tool_calls"] = []
         return response
 
     def handle_error(self, error: Exception) -> Dict[str, Any]:

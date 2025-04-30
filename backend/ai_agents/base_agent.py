@@ -20,6 +20,7 @@ class BaseAgent(ABC):
         self.model = model
         self.tokenizer = tokenizer
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.priority = 0  # Default priority
 
     @abstractmethod
     def should_handle(self, message: str) -> bool:
@@ -48,12 +49,15 @@ class BaseAgent(ABC):
         
         raise NotImplementedError(f"Tool '{tool_name}' not implemented for {self.name}")
 
-    def format_output(self, response: str, tool_calls: List[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def format_output(self, response: str, tool_calls: List[Dict[str, Any]] = None, agent_name: str = None) -> Dict[str, Any]:
+        # Ensure tool_calls is always a list
+        tool_calls = tool_calls or []
+        
         return {
             "response": response,
-            "tool_calls": tool_calls or [],
+            "tool_calls": tool_calls,
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "agent": self.name
+            "agent": agent_name or self.name
         }
 
     def filter_input(self, user_input: str) -> Tuple[str, bool]:

@@ -6,6 +6,7 @@ method: Checks schedules and confirms bookings.
 """
 import json
 import os
+import re
 from typing import List, Dict, Any
 from datetime import datetime, timezone
 from .base_agent import BaseAgent, AgentOutput, ToolDefinition
@@ -64,13 +65,36 @@ class WellnessAgent(BaseAgent):
 
         response = self.generate_response(message, memory, system_prompt)
 
+        # Prepare tool calls
+        tool_calls = []
+        service_type = self.extract_service_type(message)
+        
+        # Check if the request is for booking a service
+        if any(keyword in message.lower() for keyword in ["book", "reserve", "schedule"]):
+            tool_calls.append({
+                "tool_name": "book_session",
+                "parameters": {
+                    "service_type": service_type,
+                    "time": self._extract_time(message)
+                }
+            })
+        
+        # If no specific tool calls, add a generic check availability call
+        if not tool_calls:
+            tool_calls.append({
+                "tool_name": "check_service_availability",
+                "parameters": {
+                    "service_type": service_type
+                }
+            })
+
         # Check if the spa is available based on the current time
         spa_available = self.check_spa_availability()
 
         # Create a notification for the booking
         notification = {
             "type": "wellness_booking",
-            "service": self.extract_service_type(message),
+            "service": service_type,
             "availability": "available" if spa_available else "not available",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "agent": self.name
@@ -82,24 +106,32 @@ class WellnessAgent(BaseAgent):
             "input": message,
             "response": response,
             "notification": notification,
+            "tool_calls": tool_calls,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "agent": self.name
         })
 
-        return self.format_output(response, [notification])
+        return self.format_output(response, tool_calls)
 
     def get_available_tools(self) -> List[ToolDefinition]:
         return [
-            ToolDefinition("book_session", "Book a wellness session or spa treatment")
+            ToolDefinition("book_session", "Book a wellness session or spa treatment"),
+            ToolDefinition("check_service_availability", "Check availability of wellness services")
         ]
 
     def handle_tool_call(self, tool_name: str, **kwargs) -> Any:
         if tool_name == "book_session":
             return self.book_session(**kwargs)
+        elif tool_name == "check_service_availability":
+            return {
+                "spa_available": self.check_spa_availability(),
+                "services": self._get_available_services(),
+                "service_type": kwargs.get('service_type', 'all')
+            }
         else:
             return super().handle_tool_call(tool_name, **kwargs)
 
-    def book_session(self, service_type: str, time: str) -> Dict[str, Any]:
+    def book_session(self, service_type: str, time: str = None) -> Dict[str, Any]:
         spa_available = self.check_spa_availability()
         if spa_available:
             booking_id = f"WB{datetime.now().strftime('%Y%m%d%H%M%S')}"
@@ -107,7 +139,7 @@ class WellnessAgent(BaseAgent):
                 "booking_id": booking_id,
                 "status": "confirmed",
                 "service_type": service_type,
-                "time": time
+                "time": time or "next available slot"
             }
         else:
             return {
@@ -147,12 +179,20 @@ class WellnessAgent(BaseAgent):
         current_time = datetime.now().time()
         return opening_time <= current_time <= closing_time
 
+    def _get_available_services(self) -> List[str]:
+        return ["massage", "facial", "body treatment", "yoga", "meditation", "fitness"]
+
     def extract_service_type(self, message: str) -> str:
-        service_types = ["massage", "facial", "body treatment", "yoga", "meditation", "fitness"]
+        service_types = self._get_available_services()
         for service in service_types:
             if service in message.lower():
                 return service
         return "general wellness service"
+
+    def _extract_time(self, message: str) -> str:
+        # Simple time extraction using regex
+        time_match = re.search(r'\b(\d{1,2}(?:am|pm))\b', message.lower())
+        return time_match.group(1) if time_match else "next available"
 
     def get_keywords(self) -> List[str]:
         return ["wellness", "meditation", "yoga", "fitness", "spa", "relax", "massage", "facial", "sauna", "steam room"]
@@ -160,7 +200,7 @@ class WellnessAgent(BaseAgent):
     def _save_to_log(self, data: Dict[str, Any]):
         log_dir = os.path.join("logs", "wellness")
         os.makedirs(log_dir, exist_ok=True)
-        log_file = os.path.join(log_dir, f"wellness_log_{datetime.now().strftime('%Y%m%d')}.json")
+        log_file = os.path.join(log_dir, f"wellness_log_{datetime.now().strftime('%Y%m%d')}.jsonl")
         
         with open(log_file, "a") as f:
             json.dump(data, f)

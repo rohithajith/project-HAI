@@ -114,3 +114,4 @@ backend/models/models--gpt2/refs/main
 backend/models/models--gpt2/snapshots/607a30d783dfa663caf39e06633721c8d4cfcd7e/merges.txt
 backend/models/models--gpt2/.no_exist/607a30d783dfa663caf39e06633721c8d4cfcd7e/chat_template.jinja
 backend/data/conversations/2025-04/*.json
+backend/tests/data/conversations/2025-04/*.json
