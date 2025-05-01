@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### Changed
+- Enhanced SupervisorAgent to output structured JSON responses with agent selection reasoning
+- Updated supervisor_prompt.txt and supervisor_default_prompt.txt to instruct LLM to return JSON format
+- Modified SupervisorAgent's process method to parse and handle structured JSON responses
+- Updated AgentManager to properly handle the new structured responses
+- Fixed BaseAgent's load_prompt method to correctly handle both description and prompt file paths
+- Updated all agent classes to use the correct path format for loading prompt files
+- Fixed path resolution for description files to properly locate them from the project root
+- Simplified SupervisorAgent to use a more robust approach for agent selection
+- Updated supervisor_prompt.txt and supervisor_default_prompt.txt to use a simpler format
+- Implemented a fallback mechanism to extract agent names from conversational responses
+- Added detailed logging to help diagnose routing issues
+
+# Changelog
+
+## [Unreleased]
+
 ### Added
 - Implemented a multi-agent system for hotel guest interactions
 - Created BaseAgent class with common functionality for all agents

@@ -12,8 +12,10 @@ from datetime import datetime, timezone
 class SOSAgent(BaseAgent):
     def __init__(self, name: str, model, tokenizer):
         super().__init__(name, model, tokenizer)
+        # Use the correct path for the description file
         self.description = self.load_prompt("backend/ai_agents/descriptions/sos_agent_description.txt")
-        self.system_prompt = self.load_prompt("backend/ai_agents/prompts/sos_agent_prompt.txt")
+        # Use the correct path for the prompt file
+        self.system_prompt = self.load_prompt("sos_agent_prompt.txt")
         self.priority = 10  # Highest priority for emergencies
     def should_handle(self, message: str) -> bool:
         """

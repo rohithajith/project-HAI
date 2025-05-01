@@ -16,8 +16,10 @@ from langchain.tools import tool
 class ServiceBookingAgent(BaseAgent):
     def __init__(self, name: str, model, tokenizer):
         super().__init__(name, model, tokenizer)
+        # Use the correct path for the description file
         self.description = self.load_prompt("backend/ai_agents/descriptions/service_booking_agent_description.txt")
-        self.system_prompt = self.load_prompt("backend/ai_agents/prompts/service_booking_agent_prompt.txt")
+        # Use the correct path for the prompt file
+        self.system_prompt = self.load_prompt("service_booking_agent_prompt.txt")
         self.priority = 6  # High priority for service bookings
         self.hotel_info_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'hotel_info', 'hotel_information.txt')
         self.hotel_policy_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'hotel_info', 'hotel_policies.txt')

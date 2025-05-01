@@ -15,8 +15,10 @@ from langchain.tools import tool
 class RoomServiceAgent(BaseAgent):
     def __init__(self, name: str, model, tokenizer):
         super().__init__(name, model, tokenizer)
+        # Use the correct path for the description file
         self.description = self.load_prompt("backend/ai_agents/descriptions/room_service_agent_description.txt")
-        self.system_prompt = self.load_prompt("backend/ai_agents/prompts/room_service_agent_prompt.txt")
+        # Use the correct path for the prompt file
+        self.system_prompt = self.load_prompt("room_service_agent_prompt.txt")
         self.priority = 1  # High priority
         self.notifications = []
 

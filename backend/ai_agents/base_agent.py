@@ -69,14 +69,32 @@ class BaseAgent(ABC):
         Load a system prompt from a text file.
         
         Args:
-            filepath (str): Name of the prompt file in the prompts directory
+            filepath (str): Path to the prompt file. Can be a relative path (e.g., "prompt.txt")
+                           or a full path (e.g., "backend/ai_agents/prompts/prompt.txt")
             context (str, optional): Context to replace {context} in the prompt. Defaults to "".
         
         Returns:
             str: The loaded prompt with optional context substitution
         """
         try:
-            prompt_path = os.path.join(os.path.dirname(__file__), 'prompts', filepath)
+            # Check if filepath is a full path or just a filename
+            if os.path.dirname(filepath) == "":
+                # It's just a filename, so look in the prompts directory
+                prompt_path = os.path.join(os.path.dirname(__file__), 'prompts', filepath)
+            elif "descriptions" in filepath:
+                # It's a description file path
+                # The correct path should be relative to the current directory
+                # For example: backend/ai_agents/descriptions/supervisor_agent_description.txt
+                # We need to get the project root directory
+                current_dir = os.path.dirname(__file__)  # ai_agents directory
+                project_root = os.path.dirname(os.path.dirname(current_dir))  # project root
+                prompt_path = os.path.join(project_root, filepath)
+            else:
+                # It's a full path
+                prompt_path = filepath
+                
+            print(f"Loading prompt from: {prompt_path}")
+                
             with open(prompt_path, 'r', encoding='utf-8') as f:
                 prompt_template = f.read().strip()
             

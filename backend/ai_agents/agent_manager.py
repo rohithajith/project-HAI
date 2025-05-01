@@ -145,12 +145,25 @@ class AgentManager:
             response = self.sos_agent.process(message, self.memory)
             self.memory.add_message("assistant", response["response"], "SOSAgent")
             return response
-        
         # All routing decisions except SOS are now handled via LLM in SupervisorAgent
         response = self.supervisor.process(message, self.memory)
-        self.memory.add_message("assistant", response["response"], response.get("agent", "SupervisorAgent"))
+        
+        # Extract the agent name and reasoning from the response
+        agent_name = response.get("agent", "SupervisorAgent")
+        reasoning = response.get("reasoning", "")
+        
+        # Add the message to memory with the selected agent
+        self.memory.add_message("assistant", response["response"], agent_name)
+        
+        # Ensure tool_calls is present in the response
         if "tool_calls" not in response:
             response["tool_calls"] = []
+            
+        # Add routing information to the response if not already present
+        if reasoning and "reasoning" not in response:
+            response["reasoning"] = reasoning
+            
+        return response
         return response
 
     def handle_error(self, error: Exception) -> Dict[str, Any]:

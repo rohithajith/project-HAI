@@ -15,8 +15,10 @@ from langchain.tools import tool
 class CheckInAgent(BaseAgent):
     def __init__(self, name: str, model, tokenizer):
         super().__init__(name, model, tokenizer)
+        # Use the correct path for the description file
         self.description = self.load_prompt("backend/ai_agents/descriptions/checkin_agent_description.txt")
-        self.system_prompt = self.load_prompt("backend/ai_agents/prompts/checkin_agent_prompt.txt")
+        # Use the correct path for the prompt file
+        self.system_prompt = self.load_prompt("checkin_agent_prompt.txt")
         self.db_path = os.path.join(os.path.dirname(__file__), '..', '..', 'hotel_bookings.db')
         self.priority = 5  # Medium priority
 
