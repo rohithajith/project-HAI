@@ -10,10 +10,18 @@ Available agents:
 
 INSTRUCTIONS:
 1. Read the guest message carefully
-2. Determine which ONE agent is best suited to handle it
-3. RESPOND WITH ONLY THE AGENT NAME, nothing else
+2. Consider the conversation history if available
+3. Determine which ONE agent is best suited to handle the current message
+4. RESPOND WITH ONLY THE AGENT NAME, nothing else
 
-Available agents: $context
+ROUTING GUIDELINES:
+- For booking a cab, taxi, or transportation: ServiceBookingAgent
+- For emergencies: SOSAgent
+- For food, beverages, or room service: RoomServiceAgent
+- For maintenance issues: MaintenanceAgent
+- For spa, meditation, yoga, fitness: WellnessAgent
+- For check-in/out or booking issues: CheckInAgent
+
 Message: $message
 
 Agent to handle:

@@ -39,7 +39,7 @@ class SupervisorAgent(BaseAgent):
         if tool_name == "route_request":
             message = kwargs.get('message', '')
             agent_names = [agent.name for agent in self.agents]
-            system_prompt = self.load_prompt("supervisor_prompt.txt", context=', '.join(agent_names))
+            system_prompt = self.load_prompt("supervisor_prompt.txt", message=message)
             
             # Generate agent name from LLM
             llm_response = self.generate_response(message, None, system_prompt).strip()
@@ -84,7 +84,7 @@ class SupervisorAgent(BaseAgent):
     
     def process(self, message: str, memory) -> Dict[str, Any]:
         agent_names = [agent.name for agent in self.agents]
-        system_prompt = self.load_prompt("supervisor_prompt.txt", context=', '.join(agent_names))
+        system_prompt = self.load_prompt("supervisor_prompt.txt", message=message)
         
         # Generate agent name from LLM - the prompt now instructs the model to return just the agent name
         llm_response = self.generate_response(message, memory, system_prompt).strip()
@@ -151,7 +151,7 @@ class SupervisorAgent(BaseAgent):
     def _generate_default_response(self, message: str, memory) -> Dict[str, Any]:
         # More generic, helpful default response
         agent_names = [agent.name for agent in self.agents]
-        system_prompt = self.load_prompt("supervisor_default_prompt.txt", context=', '.join(agent_names))
+        system_prompt = self.load_prompt("supervisor_default_prompt.txt", message=message)
 
         # Generate agent name from LLM - the prompt now instructs the model to return just the agent name
         llm_response = self.generate_response(message, memory, system_prompt)

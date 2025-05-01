@@ -135,13 +135,28 @@ class AgentManager:
         self.memory.add_message("user", message)
         
         # SOS Emergency Detection - Highest Priority
-        sos_keywords = [
-            "fire", "emergency", "help", "panic attack",
-            "medical help", "urgent", "danger", "hurt",
-            "bleeding", "choking", "unconscious",
-            "need assistance", "sos", "critical"
+        # Only route directly to SOSAgent for clear emergencies
+        emergency_phrases = [
+            "emergency", "fire", "heart attack", "medical emergency",
+            "someone is hurt", "bleeding badly", "can't breathe",
+            "unconscious", "collapsed", "serious injury",
+            "urgent medical", "life threatening", "sos emergency"
         ]
-        if any(keyword in message.lower() for keyword in sos_keywords):
+        
+        # Check for clear emergency phrases (more specific than just keywords)
+        is_emergency = False
+        message_lower = message.lower()
+        
+        for phrase in emergency_phrases:
+            if phrase in message_lower:
+                # Additional context check to avoid false positives
+                # Check if this is actually about booking/requesting something
+                non_emergency_contexts = ["book", "reserve", "schedule", "when", "what time", "how much", "can i get"]
+                if not any(context in message_lower for context in non_emergency_contexts):
+                    is_emergency = True
+                    break
+        
+        if is_emergency:
             response = self.sos_agent.process(message, self.memory)
             self.memory.add_message("assistant", response["response"], "SOSAgent")
             return response
