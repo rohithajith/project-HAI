@@ -17,7 +17,7 @@ class RoomServiceAgent(BaseAgent):
     def __init__(self, name: str, model, tokenizer):
         super().__init__(name, model, tokenizer)
         self.description = "Handles guest requests for food, beverages, towels, and other room service amenities."
-        self.system_prompt = "You are a hotel room service assistant AI. Help guests place orders for food, drinks, towels, and ensure prompt delivery."
+        self.system_prompt = self.load_prompt("room_service_default_prompt.txt")
         self.priority = 1  # High priority
         self.notifications = []
 
@@ -37,23 +37,10 @@ class RoomServiceAgent(BaseAgent):
                 if score > 0.5:  # Only include highly relevant information
                     formatted_context += f"• {passage.strip()}\n"
             
-            system_prompt = (
-                "You are an AI assistant for hotel room service. "
-                f"The guest has asked about: '{message}'\n"
-                "Answer ONLY using these specific details:\n"
-                f"{formatted_context}\n"
-                "Be concise and professional. If you don't have enough information to fully "
-                "answer their question, offer to connect them with our room service team."
-            )
+            system_prompt = self.load_prompt("room_service_context_prompt.txt", context=formatted_context, message=message)
         else:
             # No relevant information found, use a generic prompt
-            system_prompt = (
-                "You are an AI assistant for hotel room service. "
-                "Respond to guests politely and efficiently. "
-                "Keep responses concise and professional. "
-                "Our hotel offers 24/7 room service with a variety of food and beverage options. "
-                "Offer to connect them with our room service team for specific menu items and details."
-            )
+            system_prompt = self.load_prompt("room_service_default_prompt.txt")
 
         response = self.generate_response(message, memory, system_prompt)
 

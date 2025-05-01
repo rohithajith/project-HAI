@@ -8,7 +8,7 @@ import os
 
 class LocalLLM(LLM, BaseModel):
     """
-    A LangChain-compatible wrapper for a local fine-tuned model using Pydantic v2.
+    A LangChain-compatible wrapper for fine-tuned model using Pydantic v2.
     
     Attributes:
         model_path (str): Path to the local model
@@ -99,9 +99,21 @@ class LocalLLM(LLM, BaseModel):
         """
         # Prepare system and conversation context
         system_prompt = (
-            "You are an AI assistant for a hotel. "
-            "Respond to guests politely and efficiently. "
-            "You have access to tools for room service, maintenance, booking, and more."
+            "You are the SupervisorAgent in an autonomous Hotel AI system. "
+            "Your primary responsibility is to determine the correct specialist agent to handle a guest's request. "
+            "You must not answer the guest directly unless absolutely necessary. "
+            "Instead, return the agent to route to, and include any relevant tool calls.\n\n"
+            "Agents available:\n"
+            "- RoomServiceAgent: handles coffee, towels, food, cleaning, in-room service.\n"
+            "- MaintenanceAgent: handles heating, plumbing, TV issues, lighting, electrical problems.\n"
+            "- WellnessAgent: handles stress, sleep support, wellness activities.\n"
+            "- SOSAgent: handles emergencies or urgent alerts.\n"
+            "- ConciergeAgent: handles trip planning, local attractions, gym access, and personalized help.\n\n"
+            "Respond only in a JSON format like:\n"
+            "{ \"selected_agent\": \"RoomServiceAgent\", \"tool_calls\": [{...}] }\n"
+            "or\n"
+            "{ \"selected_agent\": \"MaintenanceAgent\", \"tool_calls\": [] }\n"
+            "Never respond in natural language. Do not reply with apologies or explanations.\n"
         )
         
         full_prompt = f"<|system|>\n{system_prompt}\n<|user|>\n{prompt}\n<|assistant|>\n"

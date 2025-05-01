@@ -66,12 +66,9 @@ class SupervisorAgent(BaseAgent):
         return True  # Always handle for routing decision
     
     def process(self, message: str, memory) -> Dict[str, Any]:
-        system_prompt = (
-            "You are a router AI. Given the following list of agents and a message, decide which agent is best suited to handle the message.\n"
-            "Return only the name of the best-suited agent."
-        )
         agent_names = [agent.name for agent in self.agents]
-        prompt = f"Available agents: {', '.join(agent_names)}\nMessage: {message}\nAgent to handle:"
+        system_prompt = self.load_prompt("supervisor_prompt.txt", context=', '.join(agent_names))
+        prompt = f"Message: {message}\nAgent to handle:"
         selected_agent_name = self.generate_response(prompt, memory, system_prompt).strip()
         selected_agent = next((agent for agent in self.agents if agent.name == selected_agent_name), None)
         if selected_agent:
@@ -93,11 +90,7 @@ class SupervisorAgent(BaseAgent):
 
     def _generate_default_response(self, message: str, memory) -> Dict[str, Any]:
         # More generic, helpful default response
-        system_prompt = (
-            "You are an AI hotel assistant. Respond helpfully and professionally. "
-            "If you cannot directly answer the query, offer to connect the guest "
-            "with appropriate hotel services or staff."
-        )
+        system_prompt = self.load_prompt("supervisor_default_prompt.txt")
 
         # Generate a friendly, helpful response
         response = self.generate_response(message, memory, system_prompt)

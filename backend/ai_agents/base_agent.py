@@ -3,6 +3,7 @@ from typing import List, Dict, Any, Tuple, Optional, Callable
 from datetime import datetime, timezone
 import torch
 import re
+import os
 
 from pydantic import BaseModel, Field
 from langchain_core.tools import BaseTool
@@ -60,7 +61,33 @@ class BaseAgent(ABC):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.priority = 0  # Default priority
         self.description = "Base agent for hotel management system"
-        self.system_prompt = "You are an AI assistant helping with hotel-related tasks."
+        self.system_prompt = self.load_prompt("base_agent_prompt.txt")
+
+    @staticmethod
+    def load_prompt(filepath: str, context: str = "") -> str:
+        """
+        Load a system prompt from a text file.
+        
+        Args:
+            filepath (str): Name of the prompt file in the prompts directory
+            context (str, optional): Context to replace {context} in the prompt. Defaults to "".
+        
+        Returns:
+            str: The loaded prompt with optional context substitution
+        """
+        try:
+            prompt_path = os.path.join(os.path.dirname(__file__), 'prompts', filepath)
+            with open(prompt_path, 'r', encoding='utf-8') as f:
+                prompt_template = f.read().strip()
+            
+            # Replace {context} if provided
+            return prompt_template.format(context=context)
+        except FileNotFoundError:
+            print(f"Warning: Prompt file {filepath} not found. Using default prompt.")
+            return "You are an AI assistant helping with hotel-related tasks."
+        except Exception as e:
+            print(f"Error loading prompt {filepath}: {e}")
+            return "You are an AI assistant helping with hotel-related tasks."
 
     @abstractmethod
     def should_handle(self, message: str) -> bool:
