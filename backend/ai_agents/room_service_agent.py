@@ -11,10 +11,13 @@ from typing import List, Dict, Any
 from datetime import datetime, timezone, timedelta
 from .base_agent import BaseAgent, AgentOutput, ToolDefinition
 from .rag_utils import rag_helper
+from langchain.tools import tool
 
 class RoomServiceAgent(BaseAgent):
     def __init__(self, name: str, model, tokenizer):
         super().__init__(name, model, tokenizer)
+        self.description = "Handles guest requests for food, beverages, towels, and other room service amenities."
+        self.system_prompt = "You are a hotel room service assistant AI. Help guests place orders for food, drinks, towels, and ensure prompt delivery."
         self.priority = 1  # High priority
         self.notifications = []
 
@@ -217,3 +220,51 @@ class RoomServiceAgent(BaseAgent):
         with open(log_file, "a") as f:
             json.dump(clean_data, f)
             f.write("\n")
+
+    @tool
+    def check_menu_availability(self, item_type: str = None) -> Dict[str, Any]:
+        """
+        Check the availability of menu items.
+        
+        Args:
+            item_type (str, optional): Specific item type to check. Defaults to None.
+        
+        Returns:
+            Dict containing available items and their status.
+        """
+        available_items = ["towels", "breakfast", "burger", "fries"]
+        
+        if item_type:
+            return {
+                "item": item_type,
+                "available": item_type.lower() in available_items,
+                "status": "available" if item_type.lower() in available_items else "not available"
+            }
+        
+        return {
+            "available_items": available_items,
+            "status": "available"
+        }
+
+    @tool
+    def place_order(self, item_type: str, details: str = None, quantity: int = 1) -> Dict[str, Any]:
+        """
+        Place an order for room service.
+        
+        Args:
+            item_type (str): Type of item to order.
+            details (str, optional): Additional details about the order. Defaults to None.
+            quantity (int, optional): Quantity of items to order. Defaults to 1.
+        
+        Returns:
+            Dict containing order details and confirmation.
+        """
+        order_details = {
+            "order_id": f"RS-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+            "status": "placed",
+            "item_type": item_type,
+            "details": details or "",
+            "quantity": quantity,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        return order_details

@@ -11,10 +11,13 @@ from typing import List, Dict, Any
 from datetime import datetime, timezone
 from .base_agent import BaseAgent, AgentOutput, ToolDefinition
 from .rag_utils import rag_helper
+from langchain.tools import tool
 
 class WellnessAgent(BaseAgent):
     def __init__(self, name: str, model, tokenizer):
         super().__init__(name, model, tokenizer)
+        self.description = "Handles wellness service bookings such as spa, yoga, meditation, and fitness activities."
+        self.system_prompt = "You are a wellness assistant AI. Help guests book sessions for yoga, meditation, spa treatments, or fitness programs."
         self.priority = 2
         self.notifications = []
 
@@ -119,19 +122,56 @@ class WellnessAgent(BaseAgent):
             ToolDefinition("check_service_availability", "Check availability of wellness services")
         ]
 
-    def handle_tool_call(self, tool_name: str, **kwargs) -> Any:
-        if tool_name == "book_session":
-            return self.book_session(**kwargs)
-        elif tool_name == "check_service_availability":
-            return {
-                "spa_available": self.check_spa_availability(),
-                "services": self._get_available_services(),
-                "service_type": kwargs.get('service_type', 'all')
-            }
-        else:
-            return super().handle_tool_call(tool_name, **kwargs)
+    def get_keywords(self) -> List[str]:
+        return ["wellness", "meditation", "yoga", "fitness", "spa", "relax", "massage", "facial", "sauna", "steam room"]
 
+    def _save_to_log(self, data: Dict[str, Any]):
+        log_dir = os.path.join("logs", "wellness")
+        os.makedirs(log_dir, exist_ok=True)
+        log_file = os.path.join(log_dir, f"wellness_log_{datetime.now().strftime('%Y%m%d')}.jsonl")
+        
+        with open(log_file, "a") as f:
+            json.dump(data, f)
+            f.write("\n")
+
+    @tool
+    def check_service_availability(self, service_type: str = None) -> Dict[str, Any]:
+        """
+        Check availability of wellness services.
+        
+        Args:
+            service_type (str, optional): Specific service to check. Defaults to None.
+        
+        Returns:
+            Dict containing service availability details.
+        """
+        spa_available = self.check_spa_availability()
+        available_services = self._get_available_services()
+        
+        if service_type:
+            return {
+                "service": service_type,
+                "available": service_type.lower() in available_services and spa_available,
+                "spa_status": "open" if spa_available else "closed"
+            }
+        
+        return {
+            "spa_available": spa_available,
+            "available_services": available_services
+        }
+
+    @tool
     def book_session(self, service_type: str, time: str = None) -> Dict[str, Any]:
+        """
+        Book a wellness session.
+        
+        Args:
+            service_type (str): Type of wellness service to book.
+            time (str, optional): Preferred time for the session. Defaults to None.
+        
+        Returns:
+            Dict containing booking details and status.
+        """
         spa_available = self.check_spa_availability()
         if spa_available:
             booking_id = f"WB{datetime.now().strftime('%Y%m%d%H%M%S')}"
@@ -148,6 +188,12 @@ class WellnessAgent(BaseAgent):
             }
 
     def check_spa_availability(self) -> bool:
+        """
+        Check if the spa is currently available.
+        
+        Returns:
+            bool: True if spa is open, False otherwise.
+        """
         # Get spa hours from the information
         spa_passages = rag_helper.get_relevant_passages("spa hours opening", min_score=0.4)
         
@@ -180,9 +226,24 @@ class WellnessAgent(BaseAgent):
         return opening_time <= current_time <= closing_time
 
     def _get_available_services(self) -> List[str]:
+        """
+        Get a list of available wellness services.
+        
+        Returns:
+            List[str]: Available wellness services.
+        """
         return ["massage", "facial", "body treatment", "yoga", "meditation", "fitness"]
 
     def extract_service_type(self, message: str) -> str:
+        """
+        Extract the type of wellness service from the message.
+        
+        Args:
+            message (str): The input message.
+        
+        Returns:
+            str: The extracted service type or a generic wellness service.
+        """
         service_types = self._get_available_services()
         for service in service_types:
             if service in message.lower():
@@ -190,18 +251,15 @@ class WellnessAgent(BaseAgent):
         return "general wellness service"
 
     def _extract_time(self, message: str) -> str:
+        """
+        Extract the time from the message.
+        
+        Args:
+            message (str): The input message.
+        
+        Returns:
+            str: The extracted time or "next available".
+        """
         # Simple time extraction using regex
         time_match = re.search(r'\b(\d{1,2}(?:am|pm))\b', message.lower())
         return time_match.group(1) if time_match else "next available"
-
-    def get_keywords(self) -> List[str]:
-        return ["wellness", "meditation", "yoga", "fitness", "spa", "relax", "massage", "facial", "sauna", "steam room"]
-
-    def _save_to_log(self, data: Dict[str, Any]):
-        log_dir = os.path.join("logs", "wellness")
-        os.makedirs(log_dir, exist_ok=True)
-        log_file = os.path.join(log_dir, f"wellness_log_{datetime.now().strftime('%Y%m%d')}.jsonl")
-        
-        with open(log_file, "a") as f:
-            json.dump(data, f)
-            f.write("\n")

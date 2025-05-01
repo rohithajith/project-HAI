@@ -10,10 +10,13 @@ import os
 import re
 from datetime import datetime, timedelta
 from .base_agent import BaseAgent
+from langchain.tools import tool
 
 class CheckInAgent(BaseAgent):
     def __init__(self, name: str, model, tokenizer):
         super().__init__(name, model, tokenizer)
+        self.description = "Manages guest check-in processes including ID verification and reservation validation."
+        self.system_prompt = "You are a hotel check-in assistant AI. Help guests verify their ID, confirm reservations, and provide room key instructions."
         self.db_path = os.path.join(os.path.dirname(__file__), '..', '..', 'hotel_bookings.db')
         self.priority = 5  # Medium priority
 
@@ -38,8 +41,17 @@ class CheckInAgent(BaseAgent):
         
         return any(re.search(pattern, message.lower()) for pattern in check_in_patterns)
 
-    def _query_booking(self, booking_id: str) -> Dict[str, Any]:
-        """Query booking details from SQLite database"""
+    @tool
+    def query_booking(self, booking_id: str) -> Dict[str, Any]:
+        """
+        Query booking details from SQLite database.
+        
+        Args:
+            booking_id (str): The unique identifier for the booking.
+        
+        Returns:
+            Dict[str, Any]: Booking details if found, None otherwise.
+        """
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
@@ -55,8 +67,18 @@ class CheckInAgent(BaseAgent):
             print(f"Database query error: {e}")
             return None
 
-    def _check_room_availability(self, room_type: str, check_out_date: str) -> bool:
-        """Check if the same room type is available for the next day"""
+    @tool
+    def check_room_availability(self, room_type: str, check_out_date: str) -> bool:
+        """
+        Check if the same room type is available for the next day.
+        
+        Args:
+            room_type (str): The type of room to check.
+            check_out_date (str): The current booking's check-out date.
+        
+        Returns:
+            bool: True if the room is available, False otherwise.
+        """
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
@@ -84,8 +106,17 @@ class CheckInAgent(BaseAgent):
             print(f"Room availability check error: {e}")
             return False
 
-    def _extract_booking_id(self, message: str) -> str:
-        """Extract booking ID from message using regex"""
+    @tool
+    def extract_booking_id(self, message: str) -> str:
+        """
+        Extract booking ID from message using regex.
+        
+        Args:
+            message (str): The input message to search for a booking ID.
+        
+        Returns:
+            str: The extracted booking ID, or None if not found.
+        """
         # Look for numeric booking IDs, prioritizing 4-digit numbers
         match = re.search(r'\b(\d{4})\b', message)
         return match.group(1) if match else None
@@ -96,7 +127,7 @@ class CheckInAgent(BaseAgent):
             return self._handle_extend_stay(message)
 
         # Extract booking ID from message
-        booking_id = self._extract_booking_id(message)
+        booking_id = self.extract_booking_id(message)
         
         if not booking_id:
             return self.format_output(
@@ -105,7 +136,7 @@ class CheckInAgent(BaseAgent):
             )
 
         # Query booking details
-        booking = self._query_booking(booking_id)
+        booking = self.query_booking(booking_id)
         
         if not booking:
             return self.format_output(
@@ -130,7 +161,7 @@ class CheckInAgent(BaseAgent):
     def _handle_extend_stay(self, message: str) -> Dict[str, Any]:
         """Handle stay extension request"""
         # Extract booking ID if provided
-        booking_id = self._extract_booking_id(message)
+        booking_id = self.extract_booking_id(message)
         
         if not booking_id:
             return self.format_output(
@@ -139,7 +170,7 @@ class CheckInAgent(BaseAgent):
             )
 
         # Query booking details
-        booking = self._query_booking(booking_id)
+        booking = self.query_booking(booking_id)
         
         if not booking:
             return self.format_output(
@@ -151,7 +182,7 @@ class CheckInAgent(BaseAgent):
         room_type = booking.get('room_type')
         check_out_date = booking.get('check_out')
         
-        if self._check_room_availability(room_type, check_out_date):
+        if self.check_room_availability(room_type, check_out_date):
             return self.format_output(
                 f"Great news! The {room_type} is available for an extra night. "
                 "Would you like to extend your stay? Please confirm, and our staff will help you process the extension.",

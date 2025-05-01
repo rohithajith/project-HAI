@@ -13,15 +13,11 @@ class SupervisorAgent(BaseAgent):
     def __init__(self, name: str, model, tokenizer):
         super().__init__(name, model, tokenizer)
         self.agents = []
-        self.agent_keyword_map = {}
         self.priority = 10  # Highest priority as a routing agent
 
     def register_agent(self, agent: BaseAgent):
         if agent not in self.agents:
             self.agents.append(agent)
-            keywords = agent.get_keywords()
-            for keyword in keywords:
-                self.agent_keyword_map[keyword] = agent
 
     def get_available_tools(self) -> List[ToolDefinition]:
         """Define available tools for the SupervisorAgent"""
@@ -40,11 +36,17 @@ class SupervisorAgent(BaseAgent):
         """Handle specific tool calls for the SupervisorAgent"""
         if tool_name == "route_request":
             message = kwargs.get('message', '')
-            selected_agent = self._select_next_agent(message, None)
+            system_prompt = (
+                "You are a router AI. Given the following list of agents and a message, decide which agent is best suited to handle the message.\n"
+                "Return only the name of the best-suited agent."
+            )
+            agent_names = [agent.name for agent in self.agents]
+            prompt = f"Available agents: {', '.join(agent_names)}\nMessage: {message}\nAgent to handle:"
+            selected_agent_name = self.generate_response(prompt, None, system_prompt).strip()
+            selected_agent = next((agent for agent in self.agents if agent.name == selected_agent_name), None)
             if selected_agent:
                 return {
-                    "selected_agent": selected_agent.name,
-                    "agent_keywords": selected_agent.get_keywords()
+                    "selected_agent": selected_agent.name
                 }
             return {"error": "No suitable agent found"}
         
@@ -53,7 +55,6 @@ class SupervisorAgent(BaseAgent):
                 "agents": [
                     {
                         "name": agent.name, 
-                        "keywords": agent.get_keywords(),
                         "priority": getattr(agent, 'priority', 0)
                     } for agent in self.agents
                 ]
@@ -62,11 +63,17 @@ class SupervisorAgent(BaseAgent):
         raise NotImplementedError(f"Tool '{tool_name}' not implemented for SupervisorAgent")
 
     def should_handle(self, message: str) -> bool:
-        return True  # SupervisorAgent handles all messages
-
+        return True  # Always handle for routing decision
+    
     def process(self, message: str, memory) -> Dict[str, Any]:
-        # Default agent selection
-        selected_agent = self._select_next_agent(message, memory)
+        system_prompt = (
+            "You are a router AI. Given the following list of agents and a message, decide which agent is best suited to handle the message.\n"
+            "Return only the name of the best-suited agent."
+        )
+        agent_names = [agent.name for agent in self.agents]
+        prompt = f"Available agents: {', '.join(agent_names)}\nMessage: {message}\nAgent to handle:"
+        selected_agent_name = self.generate_response(prompt, memory, system_prompt).strip()
+        selected_agent = next((agent for agent in self.agents if agent.name == selected_agent_name), None)
         if selected_agent:
             response = selected_agent.process(message, memory)
             # Ensure the response includes the routing information
@@ -83,19 +90,6 @@ class SupervisorAgent(BaseAgent):
             return response
         else:
             return self._generate_default_response(message, memory)
-
-    def _select_next_agent(self, message: str, memory) -> BaseAgent:
-        # Check for direct keyword matches
-        for keyword, agent in self.agent_keyword_map.items():
-            if keyword.lower() in message.lower():
-                return agent
-
-        # If no keyword match, check which agents can handle the message
-        capable_agents = [agent for agent in self.agents if agent.should_handle(message)]
-        if capable_agents:
-            return max(capable_agents, key=lambda a: getattr(a, 'priority', 0))
-
-        return None
 
     def _generate_default_response(self, message: str, memory) -> Dict[str, Any]:
         # More generic, helpful default response

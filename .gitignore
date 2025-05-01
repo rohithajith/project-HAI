@@ -117,3 +117,4 @@ backend/data/conversations/2025-04/*.json
 backend/tests/data/conversations/2025-04/*.json
 package-lock.json
 package.json
+backend/data/conversations/
