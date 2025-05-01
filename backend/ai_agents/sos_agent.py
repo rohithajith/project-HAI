@@ -10,6 +10,11 @@ import json
 from datetime import datetime, timezone
 
 class SOSAgent(BaseAgent):
+    def __init__(self, name: str, model, tokenizer):
+        super().__init__(name, model, tokenizer)
+        self.description = self.load_prompt("backend/ai_agents/descriptions/sos_agent_description.txt")
+        self.system_prompt = self.load_prompt("backend/ai_agents/prompts/sos_agent_prompt.txt")
+        self.priority = 10  # Highest priority for emergencies
     def should_handle(self, message: str) -> bool:
         """
         Determine if the message is an SOS emergency

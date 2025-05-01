@@ -16,8 +16,8 @@ from langchain.tools import tool
 class WellnessAgent(BaseAgent):
     def __init__(self, name: str, model, tokenizer):
         super().__init__(name, model, tokenizer)
-        self.description = "Handles wellness service bookings such as spa, yoga, meditation, and fitness activities."
-        self.system_prompt = "You are a wellness assistant AI. Help guests book sessions for yoga, meditation, spa treatments, or fitness programs."
+        self.description = self.load_prompt("backend/ai_agents/descriptions/wellness_agent_description.txt")
+        self.system_prompt = self.load_prompt("backend/ai_agents/prompts/wellness_agent_prompt.txt")
         self.priority = 2
         self.notifications = []
 

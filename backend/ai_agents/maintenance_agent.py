@@ -25,8 +25,8 @@ class MaintenanceIssueInput(BaseModel):
 class MaintenanceAgent(BaseAgent):
     def __init__(self, name: str, model, tokenizer):
         super().__init__(name, model, tokenizer)
-        self.description = "Handles maintenance requests, identifies issue types, and schedules repairs or checks status based on guest reports."
-        self.system_prompt = "You are an AI hotel maintenance assistant. Help guests by reporting or scheduling fixes for broken or malfunctioning equipment."
+        self.description = self.load_prompt("backend/ai_agents/descriptions/maintenance_agent_description.txt")
+        self.system_prompt = self.load_prompt("backend/ai_agents/prompts/maintenance_agent_prompt.txt")
         self.priority = 2
         self.notifications = []
         self.local_llm = LocalLLM(model, tokenizer)

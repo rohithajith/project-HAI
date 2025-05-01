@@ -12,6 +12,7 @@ import re
 class SupervisorAgent(BaseAgent):
     def __init__(self, name: str, model, tokenizer):
         super().__init__(name, model, tokenizer)
+        self.description = self.load_prompt("backend/ai_agents/descriptions/supervisor_agent_description.txt")
         self.agents = []
         self.priority = 10  # Highest priority as a routing agent
 

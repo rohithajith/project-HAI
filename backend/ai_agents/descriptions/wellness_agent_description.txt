@@ -1,0 +1,1 @@
+Handles wellness service bookings such as spa, yoga, meditation, and fitness activities.

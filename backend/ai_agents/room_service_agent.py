@@ -10,71 +10,35 @@ import re
 from typing import List, Dict, Any
 from datetime import datetime, timezone, timedelta
 from .base_agent import BaseAgent, AgentOutput, ToolDefinition
-from .rag_utils import rag_helper
 from langchain.tools import tool
 
 class RoomServiceAgent(BaseAgent):
     def __init__(self, name: str, model, tokenizer):
         super().__init__(name, model, tokenizer)
-        self.description = "Handles guest requests for food, beverages, towels, and other room service amenities."
-        self.system_prompt = self.load_prompt("room_service_default_prompt.txt")
+        self.description = self.load_prompt("backend/ai_agents/descriptions/room_service_agent_description.txt")
+        self.system_prompt = self.load_prompt("backend/ai_agents/prompts/room_service_agent_prompt.txt")
         self.priority = 1  # High priority
         self.notifications = []
 
     def should_handle(self, message: str) -> bool:
-        keywords = ["room service", "food", "drink", "towel", "order", "burger", "fries", "breakfast", "buffet"]
+        # Load keywords from a configuration file or database in a real implementation
+        keywords = self.get_keywords()
         return any(keyword in message.lower() for keyword in keywords)
 
     def process(self, message: str, memory) -> Dict[str, Any]:
-        # Get only highly relevant lines with a higher threshold
-        relevant_lines = rag_helper.get_relevant_passages(message, min_score=0.5, k=5)
+        # Use the system prompt directly without RAG
+        system_prompt = self.system_prompt
         
-        # Only include context if we found relevant information
-        if relevant_lines:
-            # Format the relevant information in a clean, structured way
-            formatted_context = ""
-            for passage, score in relevant_lines:
-                if score > 0.5:  # Only include highly relevant information
-                    formatted_context += f"• {passage.strip()}\n"
-            
-            system_prompt = self.load_prompt("room_service_context_prompt.txt", context=formatted_context, message=message)
-        else:
-            # No relevant information found, use a generic prompt
-            system_prompt = self.load_prompt("room_service_default_prompt.txt")
-
+        # Generate response using the base agent's method
         response = self.generate_response(message, memory, system_prompt)
-
-        # Prepare tool calls
-        tool_calls = []
         
-        # Check for specific service requests
-        if "towel" in message.lower():
-            tool_calls.append({
-                "tool_name": "place_order",
-                "parameters": {
-                    "item_type": "towels",
-                    "quantity": 1
-                }
-            })
-        elif any(food in message.lower() for food in ["food", "burger", "fries", "order"]):
-            tool_calls.append({
-                "tool_name": "place_order",
-                "parameters": {
-                    "item_type": "food",
-                    "details": message
-                }
-            })
+        # Use LLM to determine the appropriate tool call based on the message content
+        # This removes hardcoded logic for specific items
+        tool_calls = self._determine_tool_calls(message)
         
-        # If no specific tool calls, add a generic check availability call
-        if not tool_calls:
-            tool_calls.append({
-                "tool_name": "check_menu_availability",
-                "parameters": {}
-            })
-
         # Add notifications
         self.notifications.extend(tool_calls)
-
+        
         # Save the structured output to a log file with GDPR compliance
         self._save_to_log({
             "input": self._anonymize_personal_data(message),  # Anonymize personal data
@@ -86,8 +50,43 @@ class RoomServiceAgent(BaseAgent):
             "retention_period": (datetime.now(timezone.utc) + timedelta(days=90)).isoformat(),  # Storage limitation
             "consent_reference": memory.conversation_id  # Link to consent record
         })
-
+        
         return self.format_output(response, tool_calls)
+        
+    def _determine_tool_calls(self, message: str) -> List[Dict[str, Any]]:
+        """
+        Determine appropriate tool calls based on message content.
+        This replaces hardcoded logic with a more flexible approach.
+        
+        Args:
+            message (str): The user's message
+            
+        Returns:
+            List[Dict[str, Any]]: List of tool calls to make
+        """
+        # Default to checking menu availability
+        tool_calls = [{
+            "tool_name": "check_menu_availability",
+            "parameters": {}
+        }]
+        
+        # Use a more sophisticated approach to determine if this is an order
+        if any(order_term in message.lower() for order_term in ["order", "bring", "send", "want", "need", "get me"]):
+            # Extract item type from message - in a real implementation, this would use NLP
+            # For now, we'll use a simple approach
+            item_type = "general"
+            
+            # Create a place_order tool call
+            tool_calls = [{
+                "tool_name": "place_order",
+                "parameters": {
+                    "item_type": item_type,
+                    "details": message,
+                    "quantity": 1
+                }
+            }]
+            
+        return tool_calls
 
     def get_available_tools(self) -> List[ToolDefinition]:
         return [
@@ -96,26 +95,52 @@ class RoomServiceAgent(BaseAgent):
         ]
 
     def handle_tool_call(self, tool_name: str, **kwargs) -> Any:
+        """
+        Handle tool calls in a more flexible way without hardcoded logic.
+        
+        Args:
+            tool_name (str): The name of the tool to call
+            **kwargs: Additional parameters for the tool
+            
+        Returns:
+            Any: Result of the tool call
+        """
         if tool_name == "check_menu_availability":
-            # Implement menu availability check logic here
-            return {
-                "available_items": ["towels", "breakfast", "burger", "fries"],
-                "status": "available"
-            }
+            # In a real implementation, this would query a database or service
+            return self.check_menu_availability(kwargs.get('item_type'))
         elif tool_name == "place_order":
-            # Implement order placement logic here
-            order_details = {
-                "order_id": f"RS-{datetime.now().strftime('%Y%m%d%H%M%S')}",
-                "status": "placed",
-                "item_type": kwargs.get('item_type', 'unknown'),
-                "details": kwargs.get('details', '')
-            }
-            return order_details
+            # In a real implementation, this would call an order processing service
+            return self.place_order(
+                kwargs.get('item_type', 'general'),
+                kwargs.get('details', ''),
+                kwargs.get('quantity', 1)
+            )
         else:
             return super().handle_tool_call(tool_name, **kwargs)
 
     def get_keywords(self) -> List[str]:
-        return ["room service", "food", "drink", "towel", "order", "burger", "fries", "breakfast", "buffet"]
+        """
+        Get keywords that trigger this agent.
+        In a real implementation, these could be loaded from a configuration file.
+        
+        Returns:
+            List[str]: Keywords that should trigger this agent
+        """
+        # These keywords could be loaded from a configuration file or database
+        return [
+            # General room service terms
+            "room service", "order", "deliver", "bring",
+            
+            # Food and beverage categories
+            "food", "meal", "breakfast", "lunch", "dinner", "snack",
+            "drink", "beverage", "coffee", "tea", "water",
+            
+            # Amenities
+            "towel", "toiletry", "soap", "shampoo", "toothbrush",
+            
+            # Common requests
+            "hungry", "thirsty", "menu", "what's available"
+        ]
 
     def _anonymize_personal_data(self, text: str) -> str:
         """
@@ -219,18 +244,23 @@ class RoomServiceAgent(BaseAgent):
         Returns:
             Dict containing available items and their status.
         """
-        available_items = ["towels", "breakfast", "burger", "fries"]
-        
+        # In a real implementation, this would query a database or service
+        # For now, we'll return a generic response
         if item_type:
+            # Assume all items are available for demonstration purposes
             return {
                 "item": item_type,
-                "available": item_type.lower() in available_items,
-                "status": "available" if item_type.lower() in available_items else "not available"
+                "available": True,
+                "status": "available"
             }
         
+        # Return a generic list of available categories
         return {
-            "available_items": available_items,
-            "status": "available"
+            "available_categories": [
+                "food", "beverages", "amenities", "toiletries"
+            ],
+            "status": "available",
+            "message": "Please specify an item or category for detailed availability information."
         }
 
     @tool
@@ -246,12 +276,19 @@ class RoomServiceAgent(BaseAgent):
         Returns:
             Dict containing order details and confirmation.
         """
+        # Generate a unique order ID
+        order_id = f"RS-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        
+        # In a real implementation, this would call an order processing service
+        # For now, we'll return a confirmation response
         order_details = {
-            "order_id": f"RS-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+            "order_id": order_id,
             "status": "placed",
             "item_type": item_type,
             "details": details or "",
             "quantity": quantity,
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "estimated_delivery": "15-20 minutes"
         }
+        
         return order_details

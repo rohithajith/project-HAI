@@ -1,0 +1,1 @@
+Handles emergency SOS requests and coordinates immediate staff response for guest safety incidents.

@@ -1,0 +1,1 @@
+Handles maintenance requests, identifies issue types, and schedules repairs or checks status based on guest reports.

@@ -1,0 +1,1 @@
+Manages bookings for hotel facilities like meeting rooms and co-working spaces.

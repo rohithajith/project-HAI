@@ -15,8 +15,8 @@ from langchain.tools import tool
 class CheckInAgent(BaseAgent):
     def __init__(self, name: str, model, tokenizer):
         super().__init__(name, model, tokenizer)
-        self.description = "Manages guest check-in processes including ID verification and reservation validation."
-        self.system_prompt = "You are a hotel check-in assistant AI. Help guests verify their ID, confirm reservations, and provide room key instructions."
+        self.description = self.load_prompt("backend/ai_agents/descriptions/checkin_agent_description.txt")
+        self.system_prompt = self.load_prompt("backend/ai_agents/prompts/checkin_agent_prompt.txt")
         self.db_path = os.path.join(os.path.dirname(__file__), '..', '..', 'hotel_bookings.db')
         self.priority = 5  # Medium priority
 

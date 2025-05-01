@@ -1,0 +1,1 @@
+Manages guest check-in processes including ID verification and reservation validation.

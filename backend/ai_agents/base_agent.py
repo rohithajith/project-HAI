@@ -60,7 +60,7 @@ class BaseAgent(ABC):
         self.tokenizer = tokenizer
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.priority = 0  # Default priority
-        self.description = "Base agent for hotel management system"
+        self.description = self.load_prompt("backend/ai_agents/descriptions/base_agent_description.txt")
         self.system_prompt = self.load_prompt("base_agent_prompt.txt")
 
     @staticmethod
