@@ -13,7 +13,7 @@ INSTRUCTIONS:
 2. Determine which ONE agent is best suited to handle it
 3. RESPOND WITH ONLY THE AGENT NAME, nothing else
 
-Available agents: {context}
-Message: {message}
+Available agents: $context
+Message: $message
 
 Agent to handle:

@@ -64,17 +64,19 @@ class BaseAgent(ABC):
         self.system_prompt = self.load_prompt("base_agent_prompt.txt")
 
     @staticmethod
-    def load_prompt(filepath: str, context: str = "") -> str:
+    def load_prompt(filepath: str, **kwargs) -> str:
         """
         Load a system prompt from a text file.
         
         Args:
             filepath (str): Path to the prompt file. Can be a relative path (e.g., "prompt.txt")
                            or a full path (e.g., "backend/ai_agents/prompts/prompt.txt")
-            context (str, optional): Context to replace {context} in the prompt. Defaults to "".
+            **kwargs: Keyword arguments to replace placeholders in the prompt.
+                     For old-style format: {context}, {message}, etc.
+                     For new-style format: $context, $message, etc.
         
         Returns:
-            str: The loaded prompt with optional context substitution
+            str: The loaded prompt with placeholders substituted
         """
         try:
             # Check if filepath is a full path or just a filename
@@ -98,8 +100,29 @@ class BaseAgent(ABC):
             with open(prompt_path, 'r', encoding='utf-8') as f:
                 prompt_template = f.read().strip()
             
-            # Replace {context} if provided
-            return prompt_template.format(context=context)
+            # Determine if we should use string.Template or format based on content
+            if '$' in prompt_template:
+                # Use string.Template for $variable style
+                from string import Template
+                template = Template(prompt_template)
+                resolved_prompt = template.safe_substitute(**kwargs)
+            else:
+                # Use format for {variable} style, but make it safe for missing keys
+                try:
+                    resolved_prompt = prompt_template.format(**kwargs)
+                except KeyError as e:
+                    # If format fails due to missing keys, fall back to partial formatting
+                    # Only format the keys that were provided
+                    for key, value in kwargs.items():
+                        placeholder = '{' + key + '}'
+                        if placeholder in prompt_template:
+                            prompt_template = prompt_template.replace(placeholder, str(value))
+                    resolved_prompt = prompt_template
+            
+            # Log the final resolved prompt for debugging
+            print(f"Resolved prompt: {resolved_prompt[:100]}..." if len(resolved_prompt) > 100 else f"Resolved prompt: {resolved_prompt}")
+            
+            return resolved_prompt
         except FileNotFoundError:
             print(f"Warning: Prompt file {filepath} not found. Using default prompt.")
             return "You are an AI assistant helping with hotel-related tasks."
