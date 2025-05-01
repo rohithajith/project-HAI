@@ -1,3 +1,6 @@
+from typing import List, Dict, Any
+import os
+import re
 """
 aim of the agent: Manages service bookings like spa and gym sessions.
 inputs of agent: User message, service type, time slot.
@@ -10,12 +13,15 @@ import os
 import re
 import json
 from datetime import datetime, timedelta
-from .base_agent import BaseAgent
+from .base_agent import BaseAgent, ToolDefinition
 from .rag_utils import rag_helper
+from langchain.tools import tool
 
 class ServiceBookingAgent(BaseAgent):
     def __init__(self, name: str, model, tokenizer):
         super().__init__(name, model, tokenizer)
+        self.description = "Manages bookings for hotel facilities like meeting rooms and co-working spaces."
+        self.system_prompt = "You are a hotel services booking AI. Assist guests with reserving meeting rooms, workspaces, and conference halls."
         self.priority = 6  # High priority for service bookings
         self.hotel_info_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'hotel_info', 'hotel_information.txt')
         self.hotel_policy_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'hotel_info', 'hotel_policies.txt')
@@ -45,6 +51,19 @@ class ServiceBookingAgent(BaseAgent):
             'wellness', 'book room', 'session'
         ]
 
+    def get_available_tools(self) -> List[ToolDefinition]:
+        """Define available tools for the ServiceBookingAgent"""
+        return [
+            ToolDefinition(
+                name="check_menu_availability", 
+                description="Check availability of a specific service or time slot"
+            ),
+            ToolDefinition(
+                name="place_order", 
+                description="Book a specific service at a given time"
+            )
+        ]
+
     def should_handle(self, message: str) -> bool:
         # Check if message contains any service-related keywords
         service_patterns = [
@@ -70,14 +89,6 @@ class ServiceBookingAgent(BaseAgent):
         except Exception as e:
             print(f"Error retrieving hotel context: {e}")
             return ""
-
-    def _check_service_availability(self, service: str, time_slot: str) -> bool:
-        """Check if the requested service and time slot are available"""
-        service = service.lower()
-        if service not in self.services:
-            return False
-        
-        return time_slot.lower() in self.services[service]['available_slots']
 
     def process(self, message: str, memory) -> Dict[str, Any]:
         # Normalize message
@@ -120,7 +131,16 @@ class ServiceBookingAgent(BaseAgent):
                 return {
                     "response": f"Your {service} session at {time_slot} has been booked successfully!",
                     "booking_details": booking_details,
-                    "agent": "ServiceBookingAgent"
+                    "agent": "ServiceBookingAgent",
+                    "tool_calls": [
+                        {
+                            "tool_name": "place_order",
+                            "parameters": {
+                                "service": service,
+                                "time": time_slot
+                            }
+                        }
+                    ]
                 }
             else:
                 return self.format_output(
@@ -139,3 +159,81 @@ class ServiceBookingAgent(BaseAgent):
     def _generate_booking_id(self) -> str:
         """Generate a unique booking ID"""
         return f"SRV-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+    @tool
+    def check_menu_availability(self, service: str = None) -> Dict[str, Any]:
+        """
+        Check availability of services and their time slots.
+        
+        Args:
+            service (str, optional): Specific service to check. Defaults to None.
+        
+        Returns:
+            Dict containing service availability details.
+        """
+        if service and service.lower() in self.services:
+            service_info = self.services[service.lower()]
+            return {
+                "service": service,
+                "available_slots": service_info['available_slots'],
+                "max_capacity": service_info['max_capacity'],
+                "duration": service_info['duration']
+            }
+        
+        # If no specific service or service not found, return all services
+        return {
+            "services": {
+                service: {
+                    "available_slots": details['available_slots'],
+                    "max_capacity": details['max_capacity'],
+                    "duration": details['duration']
+                } for service, details in self.services.items()
+            }
+        }
+
+    @tool
+    def place_order(self, service: str, time: str) -> Dict[str, Any]:
+        """
+        Book a specific service at a given time.
+        
+        Args:
+            service (str): The service to book.
+            time (str): The time slot for the booking.
+        
+        Returns:
+            Dict containing booking confirmation details.
+        """
+        # Check service availability
+        if self._check_service_availability(service, time):
+            booking_details = {
+                "service": service,
+                "time_slot": time,
+                "duration": self.services[service.lower()]['duration'],
+                "booking_id": self._generate_booking_id(),
+                "status": "confirmed",
+                "timestamp": datetime.now().isoformat()
+            }
+            return booking_details
+        
+        return {
+            "status": "unavailable",
+            "message": f"Sorry, the {service} is not available at {time}.",
+            "available_slots": self.services.get(service.lower(), {}).get('available_slots', [])
+        }
+
+    def _check_service_availability(self, service: str, time_slot: str) -> bool:
+        """
+        Check if the requested service and time slot are available.
+        
+        Args:
+            service (str): The service to check.
+            time_slot (str): The time slot to check.
+        
+        Returns:
+            bool: True if the service and time slot are available, False otherwise.
+        """
+        service = service.lower()
+        if service not in self.services:
+            return False
+        
+        return time_slot.lower() in self.services[service]['available_slots']

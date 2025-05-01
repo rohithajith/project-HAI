@@ -126,59 +126,31 @@ class AgentManager:
         # Filter user input first
         filtered_message, was_filtered = self.filter_input(message)
         
-        # If input was filtered, return safe response directly
         if was_filtered:
             safe_response = self._get_safe_output_response()
-            # Add filtered message to memory
             self.memory.add_message("user", filtered_message)
-            # Add safe response to memory
             self.memory.add_message("assistant", safe_response["response"], "FilterAgent")
             return safe_response
         
-        # Add user message to memory
         self.memory.add_message("user", message)
         
         # SOS Emergency Detection - Highest Priority
         sos_keywords = [
-            "fire", "emergency", "help", "panic attack", 
-            "medical help", "urgent", "danger", "hurt", 
-            "bleeding", "choking", "unconscious", 
+            "fire", "emergency", "help", "panic attack",
+            "medical help", "urgent", "danger", "hurt",
+            "bleeding", "choking", "unconscious",
             "need assistance", "sos", "critical"
         ]
         if any(keyword in message.lower() for keyword in sos_keywords):
             response = self.sos_agent.process(message, self.memory)
-            # Add SOS response to memory
             self.memory.add_message("assistant", response["response"], "SOSAgent")
             return response
         
-        # Fast path for room service requests
-        room_service_keywords = ["towel", "food", "drink", "order", "burger", "fries"]
-        if any(keyword in message.lower() for keyword in room_service_keywords):
-            response = self.room_service_agent.process(message, self.memory)
-            # Add assistant response to memory
-            self.memory.add_message("assistant", response["response"], "RoomServiceAgent")
-            return response
-
-        # Fast path for maintenance requests
-        maintenance_keywords = ["broken", "repair", "fix", "not working", "schedule maintenance"]
-        if any(keyword in message.lower() for keyword in maintenance_keywords):
-            response = self.maintenance_agent.process(message, self.memory)
-            # Add assistant response to memory
-            self.memory.add_message("assistant", response["response"], "MaintenanceAgent")
-            return response
-
-        # Fast path for wellness requests
-        wellness_keywords = ["wellness", "spa", "massage", "yoga", "fitness", "relax", "meditation"]
-        if any(keyword in message.lower() for keyword in wellness_keywords):
-            response = self.wellness_agent.process(message, self.memory)
-            # Add assistant response to memory
-            self.memory.add_message("assistant", response["response"], "WellnessAgent")
-            return response
-
-        # Default path: use supervisor to route the request
+        # All routing decisions except SOS are now handled via LLM in SupervisorAgent
         response = self.supervisor.process(message, self.memory)
-        # Add assistant response to memory
-        self.memory.add_message("assistant", response["response"], response["agent"])
+        self.memory.add_message("assistant", response["response"], response.get("agent", "SupervisorAgent"))
+        if "tool_calls" not in response:
+            response["tool_calls"] = []
         return response
 
     def handle_error(self, error: Exception) -> Dict[str, Any]:

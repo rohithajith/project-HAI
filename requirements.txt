@@ -7,4 +7,3 @@ bitsandbytes==0.35.0
 sqlite3
 langchain
 langchain-community
-langdetect
