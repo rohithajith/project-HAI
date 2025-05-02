@@ -1,33 +1,37 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import socket from "../socket";
 import { FaStar } from "react-icons/fa";
 
 const ChatBot = ({ role }) => {
-  const isGuest = role === "Guest";
-  const [roomNumber, setRoomNumber] = useState("");
+  const user = JSON.parse(localStorage.getItem("user")) || {};
+  const isGuest = user.role === "Guest";
+  const consent = user.consent === true;
+
+  const [roomNumber, setRoomNumber] = useState(() => localStorage.getItem("roomNumber") || "");
   const [confirmedRoom, setConfirmedRoom] = useState(() => {
-    return isGuest ? localStorage.getItem("roomNumber") || "" : role;
+    return isGuest ? localStorage.getItem("roomNumber") || "" : user.role;
   });
 
   const [message, setMessage] = useState("");
-  const [chatLog, setChatLog] = useState(() => {
-    if (isGuest) {
-      const room = localStorage.getItem("roomNumber");
-      return room ? JSON.parse(localStorage.getItem(`chat_${room}`)) || [] : [];
-    }
-    return [];
-  });
-
+  const [chatLog, setChatLog] = useState([]);
+  const chatRef = useRef(null);
   const [status, setStatus] = useState("🔴 Disconnected");
   const [awaitingRating, setAwaitingRating] = useState(null);
   const [ratingGiven, setRatingGiven] = useState(null);
   const [isTyping, setIsTyping] = useState(false);
 
   const saveChat = (updatedLog) => {
-    if (isGuest && confirmedRoom) {
+    if (isGuest && confirmedRoom && consent) {
       localStorage.setItem(`chat_${confirmedRoom}`, JSON.stringify(updatedLog));
     }
   };
+
+  useEffect(() => {
+    if (isGuest && consent && confirmedRoom) {
+      const roomChat = JSON.parse(localStorage.getItem(`chat_${confirmedRoom}`)) || [];
+      setChatLog(roomChat);
+    }
+  }, [confirmedRoom]);
 
   useEffect(() => {
     const handleConnect = () => setStatus("🟢 Connected");
@@ -37,10 +41,7 @@ const ChatBot = ({ role }) => {
       setIsTyping(false);
 
       if (data.room === confirmedRoom) {
-        const updatedLog = [
-          ...chatLog,
-          { role: "AI", content: cleaned, agent: data.agent },
-        ];
+        const updatedLog = [...chatLog, { role: "AI", content: cleaned, agent: data.agent }];
         setChatLog(updatedLog);
         saveChat(updatedLog);
 
@@ -55,10 +56,8 @@ const ChatBot = ({ role }) => {
     socket.on("disconnect", handleDisconnect);
     socket.on("guest_response", handleResponse);
 
-    // Set status + welcome message if already connected
     if (socket.connected) {
       setStatus("🟢 Connected");
-
       if (chatLog.length === 0) {
         const initialMessage = [
           {
@@ -76,7 +75,13 @@ const ChatBot = ({ role }) => {
       socket.off("disconnect", handleDisconnect);
       socket.off("guest_response", handleResponse);
     };
-  }, [confirmedRoom]);
+  }, [confirmedRoom, chatLog]);
+
+  useEffect(() => {
+    if (chatRef.current) {
+      chatRef.current.scrollTop = chatRef.current.scrollHeight;
+    }
+  }, [chatLog, isTyping]);
 
   const sendMessage = () => {
     if (message.trim() && confirmedRoom) {
@@ -117,8 +122,7 @@ const ChatBot = ({ role }) => {
     return "#28a745";
   };
 
-  // 🔸 Room number prompt only if Guest and room not yet confirmed
-  if (isGuest || !confirmedRoom) {
+  if (isGuest && !confirmedRoom.trim()) {
     return (
       <div className="p-4 mx-auto" style={{ maxWidth: "500px" }}>
         <h5 className="text-center mb-3">🏨 Enter Your Room Number</h5>
@@ -132,9 +136,13 @@ const ChatBot = ({ role }) => {
         <button
           className="btn btn-success w-100"
           onClick={() => {
-            if (roomNumber.trim()) {
-              localStorage.setItem("roomNumber", roomNumber.trim());
-              setConfirmedRoom(roomNumber.trim());
+            const trimmed = roomNumber.trim();
+            if (trimmed) {
+              localStorage.setItem("roomNumber", trimmed);
+              setConfirmedRoom(trimmed);
+              if (consent) {
+                localStorage.setItem(`chat_${trimmed}`, JSON.stringify([]));
+              }
               setChatLog([]);
             }
           }}
@@ -149,7 +157,7 @@ const ChatBot = ({ role }) => {
     <div className="p-4 mx-auto" style={{ maxWidth: "600px" }}>
       <h4 className="text-center mb-3">
         🧠 Hotel AI Chatbot {status}
-        {isGuest || confirmedRoom && (
+        {confirmedRoom && (
           <>
             <br />
             <small className="text-muted"> #{confirmedRoom}</small>
@@ -157,7 +165,14 @@ const ChatBot = ({ role }) => {
         )}
       </h4>
 
+      {!consent && (
+        <div className="alert alert-warning text-center p-2 mb-3">
+          ⚠️ You skipped giving consent. Your messages will not be saved and history will be lost when you close the app.
+        </div>
+      )}
+
       <div
+        ref={chatRef}
         className="border rounded p-3 mb-3 bg-light"
         style={{ height: "250px", overflowY: "auto" }}
       >
@@ -185,7 +200,10 @@ const ChatBot = ({ role }) => {
                   style={{
                     cursor: "pointer",
                     marginRight: "5px",
-                    color: ratingGiven && ratingGiven >= star ? getRatingColor(ratingGiven) : "#ffc107",
+                    color:
+                      ratingGiven && ratingGiven >= star
+                        ? getRatingColor(ratingGiven)
+                        : "#ffc107",
                   }}
                   onClick={() => handleRating(star)}
                 />
@@ -203,7 +221,7 @@ const ChatBot = ({ role }) => {
           onKeyDown={(e) => e.key === "Enter" && sendMessage()}
           placeholder="Type your message..."
         />
-        <button className="btn btn-primary" onClick={sendMessage}>
+        <button className="btn btn-primary" onClick={sendMessage} disabled={!message.trim()}>
           Send
         </button>
       </div>

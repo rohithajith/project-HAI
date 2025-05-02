@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Modal, Button, Badge, Form } from "react-bootstrap";
-import { FaWrench, FaSpa, FaConciergeBell, FaRobot } from "react-icons/fa";
+import { Modal, Button, Badge, Form, Alert } from "react-bootstrap";
+import { FaWrench, FaSpa, FaConciergeBell, FaRobot, FaExclamationTriangle } from "react-icons/fa";
 import socket from "../socket";
 import ChatBot from "../components/ChatBot";
 import "animate.css";
@@ -25,16 +25,15 @@ const Dashboard = () => {
     const saved = localStorage.getItem("dashboardRequests");
     return saved ? JSON.parse(saved) : [];
   });
-
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [showCompletedOnly, setShowCompletedOnly] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [isSosAlert, setIsSosAlert] = useState(false);
+  const [sosRoom, setSosRoom] = useState(null);
 
   useEffect(() => {
     const handleRequest = (data) => {
-      if (data.room === agent) return;
-
       const id = `${data.timestamp}-${data.room}-${data.agent}`;
       setRequests((prev) => {
         const exists = prev.some(
@@ -50,6 +49,12 @@ const Dashboard = () => {
           );
         }
       });
+
+      if (data.agent === "SOSAgent") {
+        setSosRoom(data.room);
+        setIsSosAlert(true);
+        setTimeout(() => setIsSosAlert(false), 10000);
+      }
     };
 
     const handleRating = ({ room, agent: ratedAgent, rating }) => {
@@ -91,11 +96,7 @@ const Dashboard = () => {
     );
     setRequests(updated);
     localStorage.setItem("dashboardRequests", JSON.stringify(updated));
-
-    socket.emit("request_completed", {
-      ...requestData,
-      status: "Completed",
-    });
+    socket.emit("request_completed", { ...requestData, status: "Completed" });
   };
 
   const handleReset = () => {
@@ -110,11 +111,9 @@ const Dashboard = () => {
     return "success";
   };
 
-  const filteredRequests =
-    agent === "Admin" ? requests : requests.filter((r) => r.agent === agent);
-
-  const roomBased = filteredRequests.filter((r) => r.room && r.room !== r.agent);
-  const miscBased = filteredRequests.filter((r) => !r.room || r.room === r.agent);
+  const filteredRequests = requests;
+  const roomBased = filteredRequests.filter((r) => r.room);
+  const miscBased = filteredRequests.filter((r) => !r.room);
   const rooms = [...new Set(roomBased.map((r) => r.room))];
   const getRoomRequests = (room) => roomBased.filter((r) => r.room === room);
 
@@ -131,7 +130,7 @@ const Dashboard = () => {
     <div className="dashboard-container">
       <div className="dashboard-header">
         <h2 className="animate__animated animate__fadeIn">
-          {agent === "Admin" ? "🏨 Admin Dashboard" : `🛎️ ${agent} Dashboard`}
+          {agent === "Admin" ? "🏨 Admin Dashboard" : `📬 ${agent} Dashboard`}
         </h2>
         <div className="d-flex gap-3 align-items-center">
           <Form.Check
@@ -146,6 +145,15 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {isSosAlert && (
+        <Alert
+          variant="danger"
+          className="text-center animate__animated animate__flash animate__infinite infinite"
+        >
+          <FaExclamationTriangle className="me-2" /> 🚨 Emergency Request Received from Room #{sosRoom}!
+        </Alert>
+      )}
+
       {displayedRooms.length === 0 && miscBased.length === 0 && (
         <p className="text-muted text-center">No service requests yet.</p>
       )}
@@ -155,9 +163,7 @@ const Dashboard = () => {
           <div key={room} className="col-md-4">
             <div
               className={`card shadow border-start border-4 hover-shadow animate__animated animate__fadeInUp dashboard-room-card ${
-                isRoomCompleted(room)
-                  ? "bg-light border-success"
-                  : "border-info"
+                isRoomCompleted(room) ? "bg-light border-success" : "border-info"
               }`}
               onClick={() => handleOpen(room)}
               style={{ cursor: "pointer" }}
@@ -180,24 +186,6 @@ const Dashboard = () => {
         ))}
       </div>
 
-      {miscBased.length > 0 && (
-        <div className="mt-4">
-          <h5 className="text-secondary mb-3">Miscellaneous Requests</h5>
-          {miscBased.map((req, idx) => (
-            <div key={idx} className="mb-4 p-3 bg-white rounded shadow-sm">
-              <div className="d-flex justify-content-between align-items-center">
-                <strong>{req.room === req.agent ? req.agent : req.room}</strong>
-                <span className={`badge bg-${statusBadge[req.status] || "secondary"}`}>
-                  {req.status || "Pending"}
-                </span>
-              </div>
-              <div className="small text-muted">🕒 {req.time || "Just now"}</div>
-              <p className="mb-1 mt-2">{req.response}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
       <Modal show={showModal} onHide={handleClose} centered size="lg">
         <Modal.Header closeButton>
           <Modal.Title>📋 Requests for Room #{selectedRoom}</Modal.Title>
@@ -208,39 +196,34 @@ const Dashboard = () => {
               <div className="d-flex justify-content-between align-items-center">
                 <div className="fw-semibold">
                   {typeIcons[req.type]} {req.type}
+                  <Badge bg="secondary" className="ms-2">Agent: {req.agent}</Badge>
                 </div>
-                <span
-                  className={`badge bg-${statusBadge[req.status] || "secondary"}`}
-                >
+                <span className={`badge bg-${statusBadge[req.status] || "secondary"}`}>
                   {req.status || "Pending"}
                 </span>
               </div>
               <div className="small text-muted">🕒 {req.time || "Just now"}</div>
-              <p className="mb-1">{req.response}</p>
-
+              <div className="mb-2">
+                <strong>🧾 Guest Request:</strong>
+                <p className="mb-1">{req.original_request || "N/A"}</p>
+              </div>
+              <div className="mb-2">
+                <strong>🤖 AI Response:</strong>
+                <p className="mb-1">{req.response}</p>
+              </div>
               {req.rating && (
                 <div className="mt-2">
-                  <span
-                    className={`badge bg-${getRatingBadge(req.rating)} px-2 py-1`}
-                  >
+                  <span className={`badge bg-${getRatingBadge(req.rating)} px-2 py-1`}>
                     ⭐ {req.rating}/5
                   </span>
                 </div>
               )}
-
               {req.status !== "Completed" && (
                 <Button
                   size="sm"
                   variant="outline-success"
                   className="mt-2"
-                  onClick={() =>
-                    handleStatusUpdate(
-                      req.room,
-                      req.timestamp,
-                      req.agent,
-                      req
-                    )
-                  }
+                  onClick={() => handleStatusUpdate(req.room, req.timestamp, req.agent, req)}
                 >
                   Mark as Done
                 </Button>
@@ -270,7 +253,6 @@ const Dashboard = () => {
               ✖
             </button>
           </div>
-
           <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
             <ChatBot role={agent} />
           </div>
