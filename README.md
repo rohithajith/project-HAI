@@ -1,3 +1,7 @@
+![Project Poster](assets/Final-A2-poster_2025.png)
+
+![Scotland Flag](https://upload.wikimedia.org/wikipedia/commons/1/10/Flag_of_Scotland.svg)
+
 # AI Agents System (`backend/ai_agents`)
  It utilizes a supervisor-worker pattern where a `SupervisorAgent` routes requests to specialized agents based on the user's message content and predefined priorities.
 
@@ -56,7 +60,7 @@ all agents will tackle the input given by suporvisor / agentmanager and produce 
     *   **Keywords:** "wellness", "meditation", "yoga", "fitness", "spa", "relax".
     *   **Tools:**  `book_session`.
     *   **Notes:** book_session will add add request to notifications [] array when triggered.
-
+And Many more ...
 
 ## Supporting Modules
 
